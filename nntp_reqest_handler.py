@@ -43,7 +43,6 @@ class NNTPRequestHandler(StreamRequestHandler):
 
         self.logger.debug("In request handler")
 
-
         if settings.SERVER_TYPE == "read-only":
             self.send_response(
                 StatusCodes.STATUS_READYNOPOST % (settings.NNTP_HOSTNAME, get_version())
@@ -58,14 +57,22 @@ class NNTPRequestHandler(StreamRequestHandler):
 
         while not self.terminated:
             try:
-                tokens = self.rfile.readline().strip().decode("utf-8", "replace").lower().split(" ")
+                tokens = (
+                    self.rfile.readline()
+                    .strip()
+                    .decode("utf-8", "replace")
+                    .lower()
+                    .split(" ")
+                )
             except IOError:
                 continue
             self.logger.debug(tokens)
             if all([t == "" for t in tokens]):
                 self.broken_oe_checker += 1
                 if self.broken_oe_checker == 10:
-                    self.logger.debug(f"WARNING: Noping out because client is sending too many empty requests")
+                    self.logger.debug(
+                        f"WARNING: Noping out because client is sending too many empty requests"
+                    )
                     self.terminated = 1
                 continue
 
@@ -78,5 +85,3 @@ class NNTPRequestHandler(StreamRequestHandler):
                 self.send_response(call_dict[command](tokens))
             elif command in ["list"]:
                 self.send_array(await call_dict[command](tokens))
-
-

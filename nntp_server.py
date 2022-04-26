@@ -86,7 +86,9 @@ class AsyncTCPServer:
         while not terminated:
             try:
                 # TODO: make timeout a setting
-                incoming_data = await asyncio.wait_for(reader.readline(), timeout=43200.0)
+                incoming_data = await asyncio.wait_for(
+                    reader.readline(), timeout=43200.0
+                )
             except TimeoutError as e:
                 self.logger.error(f"ERROR: TimeoutError occurred. {e}")
                 continue

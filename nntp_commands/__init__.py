@@ -16,7 +16,7 @@ call_dict = {
     "list": do_list,
     "mode": do_mode,
     "over": do_xover,
-    "xover": do_xover
+    "xover": do_xover,
 }
 
 commands = (

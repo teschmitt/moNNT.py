@@ -44,12 +44,13 @@ class Message(Model):
     updated_at = fields.DatetimeField(null=False)
 
     def __str__(self):
-        return (f"Newsgroup: {self.newsgroup}\n"
-                f"Sender: {self.sender}\n"
-                f"Created: {self.created_at}        \n"
-                f"Message ID: {self.message_id}\n"
-                f"Subject: {self.subject}\n"
-                f"---------------------------------------------------------\n"
-                f"{self.body}\n"
-                f"---------------------------------------------------------")
-
+        return (
+            f"Newsgroup: {self.newsgroup}\n"
+            f"Sender: {self.sender}\n"
+            f"Created: {self.created_at}        \n"
+            f"Message ID: {self.message_id}\n"
+            f"Subject: {self.subject}\n"
+            f"---------------------------------------------------------\n"
+            f"{self.body}\n"
+            f"---------------------------------------------------------"
+        )
