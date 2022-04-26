@@ -63,9 +63,11 @@ class AsyncTCPServer:
 
     async def _handle_client(self, reader, writer) -> None:
         terminated: bool = False
-        broken_oe_checker: int = 0
+        empty_token_counter: int = 0
         selected_group: str = ""  # variable to save a selected group for later
         selected_article: str = ""  # variable to save a selected group for later
+        # sending_article: bool = False
+        # auth_username
 
         if settings.SERVER_TYPE == "read-only":
             self._send_str(
@@ -97,14 +99,16 @@ class AsyncTCPServer:
                 continue
 
             if all([t == "" for t in tokens]):
-                broken_oe_checker += 1
-                # TODO: make broken_oe_checker a setting
-                if broken_oe_checker == 10:
+                empty_token_counter += 1
+                # TODO: make empty_token_counter a setting
+                if empty_token_counter == 10:
                     self.logger.warning(
                         f"WARNING: Noping out because client is sending too many empty requests"
                     )
                     terminated = True
                 continue
+            else:
+                empty_token_counter = 0
 
             self.logger.debug(
                 f"{writer.get_extra_info(name='peername')} > {' | '.join(tokens)}"
