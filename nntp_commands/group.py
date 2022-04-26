@@ -1,9 +1,8 @@
-from typing import List
+from typing import Optional
 
 from tortoise.functions import Count, Max, Min
 
 from models import Message
-from settings import settings
 from status_codes import StatusCodes
 
 
@@ -22,16 +21,20 @@ async def do_group(tokens: List[str]) -> str:
     if len(tokens) != 1:
         return StatusCodes.ERR_CMDSYNTAXERROR
 
-    group_stats = (
+    group_stats: Optional[dict] = (
         await Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
         .group_by("newsgroup__id")
         .filter(newsgroup__name=tokens[0])
         .first()
         .values(name="newsgroup__name", count="count", min="min", max="max")
     )
-    return StatusCodes.STATUS_GROUPSELECTED % (
-        group_stats["count"],
-        group_stats["min"],
-        group_stats["max"],
-        group_stats["name"],
+
+    if group_stats is None:
+        return StatusCodes.ERR_NOSUCHGROUP
+
+    return StatusCodes.STATUS_GROUPSELECTED.substitute(
+        count=group_stats["count"],
+        first=group_stats["min"],
+        last=group_stats["max"],
+        name=group_stats["name"],
     )
