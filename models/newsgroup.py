@@ -19,6 +19,8 @@ class Newsgroup(Model):
     name = fields.CharField(max_length=255, null=False)
     is_active: fields.BooleanField(null=False, default=True)
     description = fields.TextField(null=True)
+    status = fields.CharField(max_length=1, default="y")
+    default_subscribe = fields.BooleanField(null=False, default=True)
     created_at = fields.DatetimeField(auto_now_add=True, null=False)
     updated_at = fields.DatetimeField(auto_now=True, null=False)
 
