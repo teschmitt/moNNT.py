@@ -1,8 +1,8 @@
 import asyncio
-from asyncio import StreamWriter, StreamReader, Task
+from asyncio import StreamReader, StreamWriter, Task
 from logging import Logger
 from socketserver import ForkingTCPServer
-from typing import Union, List, Tuple
+from typing import List, Union
 
 from logger import global_logger
 from nntp_commands import call_dict
@@ -26,9 +26,7 @@ class AsyncTCPServer:
         self.clients: dict = {}
         self.logger: Logger = global_logger(__name__)
 
-    def _send_array(
-        self, writer: StreamWriter, send_obj: Union[List[str], str]
-    ) -> None:
+    def _send_array(self, writer: StreamWriter, send_obj: Union[List[str], str]) -> None:
         if type(send_obj) is str:
             # there has been an error and we're only returning the error code
             self._send_str(writer, send_obj)
@@ -72,31 +70,25 @@ class AsyncTCPServer:
         if settings.SERVER_TYPE == "read-only":
             self._send_str(
                 writer,
-                StatusCodes.STATUS_READYNOPOST
-                % (settings.NNTP_HOSTNAME, get_version()),
+                StatusCodes.STATUS_READYNOPOST % (settings.NNTP_HOSTNAME, get_version()),
             )
         else:
             self._send_str(
                 writer,
-                StatusCodes.STATUS_READYOKPOST
-                % (settings.NNTP_HOSTNAME, get_version()),
+                StatusCodes.STATUS_READYOKPOST % (settings.NNTP_HOSTNAME, get_version()),
             )
 
         # main execution loop for handling a connection until it's closed
         while not terminated:
             try:
                 # TODO: make timeout a setting
-                incoming_data = await asyncio.wait_for(
-                    reader.readline(), timeout=43200.0
-                )
+                incoming_data = await asyncio.wait_for(reader.readline(), timeout=43200.0)
             except TimeoutError as e:
                 self.logger.error(f"ERROR: TimeoutError occurred. {e}")
                 continue
 
             try:
-                tokens = (
-                    incoming_data.decode(encoding="utf-8").strip().lower().split(" ")
-                )
+                tokens = incoming_data.decode(encoding="utf-8").strip().lower().split(" ")
             except IOError:
                 continue
 
@@ -105,16 +97,14 @@ class AsyncTCPServer:
                 # TODO: make empty_token_counter a setting
                 if empty_token_counter >= settings.MAX_EMPTY_REQUESTS:
                     self.logger.warning(
-                        f"WARNING: Noping out because client is sending too many empty requests"
+                        "WARNING: Noping out because client is sending too many empty requests"
                     )
                     terminated = True
                 continue
             else:
                 empty_token_counter = 0
 
-            self.logger.debug(
-                f"{writer.get_extra_info(name='peername')} > {' | '.join(tokens)}"
-            )
+            self.logger.debug(f"{writer.get_extra_info(name='peername')} > {' | '.join(tokens)}")
 
             command = tokens.pop(0)
 

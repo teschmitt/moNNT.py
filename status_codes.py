@@ -50,9 +50,7 @@ class StatusCodes:
     STATUS_ARTICLE: str = "220 %s %s All of the article follows"
     STATUS_BODY: str = "222 %s %s article retrieved - body follows"
     STATUS_DATE: str = "111 %s"
-    STATUS_GROUPSELECTED: Template = Template(
-        "211 $count $first $last $name group selected"
-    )
+    STATUS_GROUPSELECTED: Template = Template("211 $count $first $last $name group selected")
     STATUS_HEAD: str = "221 %s %s article retrieved - head follows"
     STATUS_LISTGROUP: str = "211 %s %s %s %s"
     STATUS_READYNOPOST: str = "201 %s moNNT.py %s server ready (no posting allowed)"

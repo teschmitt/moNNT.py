@@ -25,6 +25,7 @@ src_folder = "./."
 
 [tool.black]
 include = '\.pyi?$'
+line-length = 100
 target-version = ["py36", "py37", "py38", "py39"]
 preview = true
 exclude = '''
