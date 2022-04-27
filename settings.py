@@ -38,6 +38,9 @@ class GlobalSettings(BaseSettings):
     # environment variables)
     NNTP_CACHE_PATH: Optional[str] = None
 
+    # server behavior
+    MAX_EMPTY_REQUESTS: Optional[int] = 10
+
     class Config:
         """Loads the dotenv file."""
 

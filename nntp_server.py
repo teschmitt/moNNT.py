@@ -103,7 +103,7 @@ class AsyncTCPServer:
             if all([t == "" for t in tokens]):
                 empty_token_counter += 1
                 # TODO: make empty_token_counter a setting
-                if empty_token_counter == 10:
+                if empty_token_counter >= settings.MAX_EMPTY_REQUESTS:
                     self.logger.warning(
                         f"WARNING: Noping out because client is sending too many empty requests"
                     )
