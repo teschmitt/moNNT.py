@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING
+
 from nntp_commands import logger
 from settings import settings
 from status_codes import StatusCodes
 
+if TYPE_CHECKING:
+    from nntp_server import AsyncTCPServer
 
-async def do_mode(server_state) -> str:
+
+async def do_mode(server_state: "AsyncTCPServer") -> str:
     """
     Syntax:
         MODE READER|STREAM

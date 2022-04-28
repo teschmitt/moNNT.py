@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
 
 from tortoise.queryset import QuerySet
 
@@ -6,16 +6,19 @@ from models import Message
 from settings import settings
 from status_codes import StatusCodes
 
+if TYPE_CHECKING:
+    from nntp_server import AsyncTCPServer
+
 
 def get_messages(group: str, start: int, stop: int) -> QuerySet[Message]:
     return Message.filter(newsgroup__name=group, id__gte=start, id__lte=stop)
 
 
-async def do_xover(server_state) -> Union[List[str], str]:
+async def do_xover(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     tokens: list[str] = server_state.cmd_args
     selected_group: str = server_state.selected_group
 
-    if selected_group == "":
+    if selected_group is None:
         return StatusCodes.ERR_NOGROUPSELECTED
 
     if len(tokens) == 0:

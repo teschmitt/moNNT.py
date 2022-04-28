@@ -1,5 +1,5 @@
 from fnmatch import fnmatch
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from tortoise.functions import Count, Max, Min
 from tortoise.queryset import ValuesQuery
@@ -8,6 +8,9 @@ from logger import global_logger
 from models import Message, Newsgroup
 from settings import settings
 from status_codes import StatusCodes
+
+if TYPE_CHECKING:
+    from nntp_server import AsyncTCPServer
 
 logger = global_logger(__name__)
 
@@ -50,7 +53,7 @@ def groupname_filter(groups: list[dict], pattern: str) -> filter:
     return filter(lambda v: fnmatch(v["name"], pattern), groups)
 
 
-async def do_list(server_state) -> Union[list[str], str]:
+async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
     """
     Syntax:
         LIST
