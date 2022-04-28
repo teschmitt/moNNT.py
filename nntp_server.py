@@ -2,7 +2,7 @@ import asyncio
 from asyncio import StreamReader, StreamWriter, Task
 from logging import Logger
 from socketserver import ForkingTCPServer
-from typing import List, Union
+from typing import List, Optional, Union
 
 from logger import global_logger
 from nntp_commands import call_dict
@@ -25,20 +25,23 @@ class AsyncTCPServer:
         self.writer: StreamWriter
         self.clients: dict = {}
         self.logger: Logger = global_logger(__name__)
+        self._terminated: bool = False
+        self._empty_token_counter: int = 0
+        self._cmd_args: Optional[list[str]] = None
+        self._selected_group: Optional[str] = None  # field to save a selected group
+        self._selected_article: Optional[str] = None  # field to save a selected group
+        # self.sending_article: bool = False
+        # self.auth_username
 
-    def _send_array(self, writer: StreamWriter, send_obj: Union[List[str], str]) -> None:
+    def _send(self, writer: StreamWriter, send_obj: Union[List[str], str]) -> None:
         if type(send_obj) is str:
-            # there has been an error and we're only returning the error code
-            self._send_str(writer, send_obj)
+            self.logger.debug(f"server > {send_obj}")
+            writer.write(f"{send_obj}\r\n".encode(encoding="utf-8"))
         else:
             send_obj.append(".")
             for line in send_obj:
                 self.logger.debug(f"server > {line}")
                 writer.write(f"{line}\r\n".encode(encoding="utf-8"))
-
-    def _send_str(self, writer: StreamWriter, send_str: str) -> None:
-        self.logger.debug(f"server > {send_str}")
-        writer.write(f"{send_str}\r\n".encode(encoding="utf-8"))
 
     async def _accept_client(self, reader: StreamReader, writer: StreamWriter) -> None:
         self.reader: StreamReader = reader
@@ -60,26 +63,19 @@ class AsyncTCPServer:
         self.logger.info(f"Connected to client at {addr}:{port}")
 
     async def _handle_client(self, reader, writer) -> None:
-        terminated: bool = False
-        empty_token_counter: int = 0
-        selected_group: str = ""  # variable to save a selected group for later
-        selected_article: str = ""  # variable to save a selected group for later
-        # sending_article: bool = False
-        # auth_username
-
         if settings.SERVER_TYPE == "read-only":
-            self._send_str(
+            self._send(
                 writer,
                 StatusCodes.STATUS_READYNOPOST % (settings.NNTP_HOSTNAME, get_version()),
             )
         else:
-            self._send_str(
+            self._send(
                 writer,
                 StatusCodes.STATUS_READYOKPOST % (settings.NNTP_HOSTNAME, get_version()),
             )
 
         # main execution loop for handling a connection until it's closed
-        while not terminated:
+        while not self._terminated:
             try:
                 # TODO: make timeout a setting
                 incoming_data = await asyncio.wait_for(reader.readline(), timeout=43200.0)
@@ -88,44 +84,61 @@ class AsyncTCPServer:
                 continue
 
             try:
-                tokens = incoming_data.decode(encoding="utf-8").strip().lower().split(" ")
+                tokens: list[str] = (
+                    incoming_data.decode(encoding="utf-8").strip().lower().split(" ")
+                )
             except IOError:
                 continue
 
             if all([t == "" for t in tokens]):
-                empty_token_counter += 1
-                # TODO: make empty_token_counter a setting
-                if empty_token_counter >= settings.MAX_EMPTY_REQUESTS:
+                self._empty_token_counter += 1
+                if self._empty_token_counter >= settings.MAX_EMPTY_REQUESTS:
                     self.logger.warning(
                         "WARNING: Noping out because client is sending too many empty requests"
                     )
-                    terminated = True
+                    self._terminated = True
                 continue
             else:
-                empty_token_counter = 0
+                self._empty_token_counter = 0
 
             self.logger.debug(f"{writer.get_extra_info(name='peername')} > {' | '.join(tokens)}")
 
-            command = tokens.pop(0)
+            command: Optional[str] = tokens.pop(0) if len(tokens) > 0 else None
+            self._cmd_args: Optional[list[str]] = tokens
 
             # special case: loading messages first sets a group and then specifies which
             # headers or article to load, so we save the group for the next call
-            if command == "group":
-                # Todo: Error handling in here if tokens[0] does not exist
-                selected_group = tokens[0]
-            elif command == "article":
-                # Todo: Error handling in here if tokens[0] does not exist
-                selected_article = tokens[0]
-                tokens = [selected_group] + [selected_article] + tokens
-            elif command in ["over", "xover"]:
-                tokens = [selected_group] + tokens
+            if command == "article":
+                self._selected_article = self._cmd_args[0] if len(self._cmd_args) > 0 else None
 
-            if command in ["mode", "group", "capabilities", "over", "xover"]:
-                self._send_str(writer, await call_dict[command](tokens))
-            elif command in ["article", "list"]:
-                self._send_array(writer, await call_dict[command](tokens))
+            if command in ["article", "capabilities", "list", "mode", "group", "over", "xover"]:
+                self._send(writer, await call_dict[command](self))
 
     async def start_serving(self):
         await asyncio.start_server(
             client_connected_cb=self._accept_client, host=self.hostname, port=self.port
         )
+
+    @property
+    def cmd_args(self) -> Optional[list[str]]:
+        return self._cmd_args
+
+    @property
+    def terminated(self) -> bool:
+        return self._terminated
+
+    @property
+    def selected_group(self) -> Optional[str]:
+        return self._selected_group
+
+    @selected_group.setter
+    def selected_group(self, val) -> None:
+        self._selected_group = val
+
+    @property
+    def selected_article(self) -> Optional[str]:
+        return self._selected_article
+
+    @selected_article.setter
+    def selected_article(self, val) -> None:
+        self._selected_article = val

@@ -1,11 +1,9 @@
-from typing import List
-
 from nntp_commands import logger
 from settings import settings
 from status_codes import StatusCodes
 
 
-async def do_mode(tokens: List[str]) -> str:
+async def do_mode(server_state) -> str:
     """
     Syntax:
         MODE READER|STREAM
@@ -15,6 +13,7 @@ async def do_mode(tokens: List[str]) -> str:
         203 Streaming is OK
         500 Command not understood
     """
+    tokens: list[str] = server_state.cmd_args
     logger.debug(f"in do_mode with {tokens}")
     if tokens[0] == "reader":
         if settings.SERVER_TYPE == "read-only":

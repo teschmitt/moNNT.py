@@ -6,7 +6,7 @@ from models import Message
 from status_codes import StatusCodes
 
 
-async def do_group(tokens: List[str]) -> str:
+async def do_group(server_state) -> str:
     """
     Syntax:
         GROUP ggg
@@ -18,8 +18,13 @@ async def do_group(tokens: List[str]) -> str:
             s = name of the group.)
         411 no such news group
     """
+
+    tokens: list[str] = server_state.cmd_args
+
     if len(tokens) != 1:
         return StatusCodes.ERR_CMDSYNTAXERROR
+
+    server_state.selected_group = tokens[0]
 
     group_stats: Optional[dict] = (
         await Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))

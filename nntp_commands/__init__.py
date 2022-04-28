@@ -2,21 +2,17 @@ from logger import global_logger
 
 logger = global_logger(__name__)
 
-from nntp_commands.article import do_article
-from nntp_commands.capabilities import do_capabilities
-from nntp_commands.group import do_group
-from nntp_commands.list import do_list
-from nntp_commands.mode import do_mode
-from nntp_commands.xover import do_xover
+
+from nntp_commands import article, capabilities, group, list, mode, xover  # noqa: E402
 
 call_dict = {
-    "article": do_article,
-    "capabilities": do_capabilities,
-    "group": do_group,
-    "list": do_list,
-    "mode": do_mode,
-    "over": do_xover,
-    "xover": do_xover,
+    "article": article.do_article,
+    "capabilities": capabilities.do_capabilities,
+    "group": group.do_group,
+    "list": list.do_list,
+    "mode": mode.do_mode,
+    "over": xover.do_xover,
+    "xover": xover.do_xover,
 }
 
 commands = (

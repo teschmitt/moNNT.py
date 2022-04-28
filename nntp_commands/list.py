@@ -1,10 +1,11 @@
 from fnmatch import fnmatch
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from tortoise.functions import Count, Max, Min
+from tortoise.queryset import ValuesQuery
 
 from logger import global_logger
-from models import Newsgroup, Message
+from models import Message, Newsgroup
 from settings import settings
 from status_codes import StatusCodes
 
@@ -36,9 +37,9 @@ extensions = (
 )
 
 
-def get_group_stats() -> list[dict]:
+def get_group_stats() -> ValuesQuery:
     return (
-        await Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
+        Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
         .group_by("newsgroup__id")
         .order_by("newsgroup__name")
         .values(name="newsgroup__name", count="count", min="min", max="max")
@@ -49,7 +50,7 @@ def groupname_filter(groups: list[dict], pattern: str) -> filter:
     return filter(lambda v: fnmatch(v["name"], pattern), groups)
 
 
-async def do_list(tokens: List[str]) -> Union[List[str], str]:
+async def do_list(server_state) -> Union[list[str], str]:
     """
     Syntax:
         LIST
@@ -65,7 +66,8 @@ async def do_list(tokens: List[str]) -> Union[List[str], str]:
         215 list of newsgroups follows
         503 program error, function not performed
     """
-    result_stats: List[str] = []
+    tokens: list[str] = server_state.cmd_args
+    result_stats: list[str] = []
     option: Optional[str] = tokens[0] if len(tokens) > 0 else None
 
     if len(tokens) > 2:
@@ -79,7 +81,7 @@ async def do_list(tokens: List[str]) -> Union[List[str], str]:
             # DB against this sort of pattern since it was created more or less
             # only for NNTP *sheesh*
             pattern: str = tokens[1]
-            group_stats = groupname_filter(group_stats, pattern)
+            group_stats = groupname_filter(await group_stats, pattern)
 
         post_allowed = "y" if settings.SERVER_TYPE == "read-write" else "n"
         result_stats = [StatusCodes.STATUS_LIST]

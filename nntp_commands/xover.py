@@ -1,4 +1,4 @@
-from typing import List, Union, Awaitable
+from typing import List, Union
 
 from tortoise.queryset import QuerySet
 
@@ -11,12 +11,11 @@ def get_messages(group: str, start: int, stop: int) -> QuerySet[Message]:
     return Message.filter(newsgroup__name=group, id__gte=start, id__lte=stop)
 
 
-async def do_xover(tokens: List[str]) -> Union[List[str], str]:
-    selected_group = tokens.pop(0)
+async def do_xover(server_state) -> Union[List[str], str]:
+    tokens: list[str] = server_state.cmd_args
+    selected_group: str = server_state.selected_group
 
     if selected_group == "":
-        # TODO: This will not work since there will always be something in tokens[0]
-        # check the group against the DB or so some other error checking
         return StatusCodes.ERR_NOGROUPSELECTED
 
     if len(tokens) == 0:
@@ -32,7 +31,8 @@ async def do_xover(tokens: List[str]) -> Union[List[str], str]:
         start = int(msg_range[0])
         stop_str: str = msg_range[1]
         if stop_str != "ggg":
-            # Todo: this is not entirely correct. Find out the exact different forms the parameters for XOVER and OVER can have
+            # Todo: this is not entirely correct. Find out the exact different forms
+            #       the parameters for XOVER and OVER can have
             stop = int(stop_str)
 
     headers = []
