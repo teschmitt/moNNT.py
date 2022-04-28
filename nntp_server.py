@@ -5,6 +5,7 @@ from socketserver import ForkingTCPServer
 from typing import List, Optional, Union
 
 from logger import global_logger
+from models import Message, Newsgroup
 from nntp_commands import call_dict
 from settings import settings
 from status_codes import StatusCodes
@@ -28,8 +29,8 @@ class AsyncTCPServer:
         self._terminated: bool = False
         self._empty_token_counter: int = 0
         self._cmd_args: Optional[list[str]] = None
-        self._selected_group: Optional[str] = None  # field to save a selected group
-        self._selected_article: Optional[str] = None  # field to save a selected group
+        self._selected_group: Optional[Newsgroup] = None  # field to save a selected group
+        self._selected_article: Optional[Message] = None  # field to save a selected group
         # self.sending_article: bool = False
         # self.auth_username
 
@@ -106,11 +107,6 @@ class AsyncTCPServer:
             command: Optional[str] = tokens.pop(0) if len(tokens) > 0 else None
             self._cmd_args: Optional[list[str]] = tokens
 
-            # special case: loading messages first sets a group and then specifies which
-            # headers or article to load, so we save the group for the next call
-            if command == "article":
-                self._selected_article = self._cmd_args[0] if len(self._cmd_args) > 0 else None
-
             if command in ["article", "capabilities", "list", "mode", "group", "over", "xover"]:
                 self._send(writer, await call_dict[command](self))
 
@@ -128,7 +124,7 @@ class AsyncTCPServer:
         return self._terminated
 
     @property
-    def selected_group(self) -> Optional[str]:
+    def selected_group(self) -> Optional[Newsgroup]:
         return self._selected_group
 
     @selected_group.setter
@@ -136,7 +132,7 @@ class AsyncTCPServer:
         self._selected_group = val
 
     @property
-    def selected_article(self) -> Optional[str]:
+    def selected_article(self) -> Optional[Message]:
         return self._selected_article
 
     @selected_article.setter

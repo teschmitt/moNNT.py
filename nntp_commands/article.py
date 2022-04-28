@@ -1,41 +1,65 @@
-from typing import List, Union, Awaitable
+from typing import TYPE_CHECKING, List, Optional, Union
 
-from tortoise.queryset import QuerySet, QuerySetSingle
+from tortoise.queryset import QuerySetSingle
 
-from models import Message
+from models import Message, Newsgroup
 from settings import settings
 from status_codes import StatusCodes
 
+if TYPE_CHECKING:
+    from nntp_server import AsyncTCPServer
 
-def get_messages_by_id(_id: int) -> QuerySetSingle[Message]:
-    return Message.get_or_none(id=_id)
+
+def get_messages_by_num(num: int, group: Newsgroup) -> QuerySetSingle[Message]:
+    return Message.get_or_none(id=num, newsgroup=group)
 
 
 def get_messages_by_msg_id(message_id: str) -> QuerySetSingle[Message]:
     return Message.get_or_none(message_id=message_id)
 
 
-async def do_article(tokens: List[str]) -> Union[List[str], str]:
+async def do_article(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+    """
+    This command has a very lax syntax:
+        ARTICLE message-id
+        ARTICLE number
+        ARTICLE
+    can all be valid calls
+    :param server_state: the currently processing server instance
+    :return: result of query
+    """
     article_info: list
     response_status: str
 
-    selected_group = tokens.pop(0)
+    identifier: Optional[str] = server_state.cmd_args[0] if len(server_state.cmd_args) > 0 else None
+    selected_group: Optional[Newsgroup] = server_state.selected_group
 
-    try:
-        selected_article: str = tokens.pop(0)
-    except IndexError:
-        return StatusCodes.ERR_NOARTICLESELECTED
+    # figure out how the article is supposed to be identified
+    id_provided: bool = identifier is not None and "<" in identifier and ">" in identifier
+    nr_provided: bool = not id_provided and identifier is not None
 
-    if "<" in selected_article and ">" in selected_article:
-        msg: Message = await get_messages_by_msg_id(selected_article)
-        # TODO: Maybe msg.id must always be 1 … if error then try 1:
-    else:
+    if id_provided:
+        # RFC 3977 Sec. 6.2.1.1. First form
+        identifier = identifier.replace("<", "").replace(">", "")
+        msg: Message = await get_messages_by_msg_id(identifier)
+    elif nr_provided:
+        # second form
+        if selected_group is None:
+            # when a msg nr is provided, a group must be selected
+            return StatusCodes.ERR_NOGROUPSELECTED
         try:
-            _id: int = int(selected_article)
+            num: int = int(identifier)
         except ValueError:
-            # TODO: an unintelligible value was passed, maybe find a better error
             return StatusCodes.ERR_NOARTICLESELECTED
-        msg: Message = await get_messages_by_id(_id)
+        msg: Message = await get_messages_by_num(num, selected_group)
+    else:
+        # third form
+        msg: Message = server_state.selected_article
+
+    if msg is None:
+        return StatusCodes.ERR_NOSUCHARTICLE
+
+    server_state.selected_article = msg
 
     try:
         response_status = StatusCodes.STATUS_ARTICLE % (
@@ -54,8 +78,8 @@ async def do_article(tokens: List[str]) -> Union[List[str], str]:
         f"Subject: {msg.subject}",
         f"Message-ID: {msg.message_id}",
         f"Xref: {settings.DOMAIN_NAME} {selected_group}:{msg.id}",
-        f"References: ",
-        f"",
+        "References: ",
+        "",
         f"{msg.body}",
     ]
 
