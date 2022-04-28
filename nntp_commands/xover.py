@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 from tortoise.queryset import QuerySet
 
@@ -16,7 +16,7 @@ def get_messages(group: str, start: int, stop: int) -> QuerySet[Message]:
 
 async def do_xover(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     tokens: list[str] = server_state.cmd_args
-    selected_group: str = server_state.selected_group
+    selected_group: Optional[str] = server_state.selected_group
 
     if selected_group is None:
         return StatusCodes.ERR_NOGROUPSELECTED
