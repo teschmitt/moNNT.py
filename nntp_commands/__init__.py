@@ -9,9 +9,9 @@ from nntp_commands import (  # noqa: E402
     group,
     list,
     mode,
+    over,
     post,
     quit_,
-    xover,
 )
 
 call_dict = {
@@ -20,8 +20,8 @@ call_dict = {
     "group": group.do_group,
     "list": list.do_list,
     "mode": mode.do_mode,
-    "over": xover.do_xover,
+    "over": over.do_over,
     "post": post.do_post,
     "quit": quit_.do_quit,
-    "xover": xover.do_xover,
+    "xover": over.do_over,
 }

@@ -70,6 +70,9 @@ class AsyncTCPServer:
         self.logger.info(f"Connected to client at {addr}:{port}")
 
     async def _handle_client(self, reader, writer) -> None:
+        self._terminated = False
+        self._empty_token_counter = 0
+
         if settings.SERVER_TYPE == "read-only":
             self._send(
                 StatusCodes.STATUS_READYNOPOST % (settings.NNTP_HOSTNAME, get_version()),
@@ -121,8 +124,6 @@ class AsyncTCPServer:
                 continue
             else:
                 self._empty_token_counter = 0
-
-            self.logger.debug(f"{writer.get_extra_info(name='peername')} > {' | '.join(tokens)}")
 
             command: Optional[str] = tokens.pop(0) if len(tokens) > 0 else None
             self._cmd_args: Optional[list[str]] = tokens
@@ -185,11 +186,9 @@ class AsyncTCPServer:
 
         # we've popped off the complete header, body is just the joined rest
         body: str = "\n".join(self._article_buffer)
-        print(f"parsed body: {body}")
         dt: datetime = (
             date_parse(header["date"]) if len(header["date"]) > 0 else datetime.datetime.utcnow()
         )
-        print(f"parsed date: {dt}")
         article = await Message.create(
             newsgroup=group,
             sender=header["from"],

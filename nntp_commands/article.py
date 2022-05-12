@@ -20,13 +20,35 @@ def get_messages_by_msg_id(message_id: str) -> QuerySetSingle[Message]:
 
 async def do_article(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
-    This command has a very lax syntax:
-        ARTICLE message-id
-        ARTICLE number
-        ARTICLE
-    can all be valid calls
-    :param server_state: the currently processing server instance
-    :return: result of query
+    6.2.1.1.  Usage
+
+        Indicating capability: READER
+
+        Syntax
+            ARTICLE message-id
+            ARTICLE number
+            ARTICLE
+
+        Responses
+
+        First form (message-id specified)
+            220 0|n message-id    Article follows (multi-line)
+            430                   No article with that message-id
+
+        Second form (article number specified)
+            220 n message-id      Article follows (multi-line)
+            412                   No newsgroup selected
+            423                   No article with that number
+
+        Third form (current article number used)
+            220 n message-id      Article follows (multi-line)
+            412                   No newsgroup selected
+            420                   Current article number is invalid
+
+        Parameters
+            number        Requested article number
+            n             Returned article number
+            message-id    Article message-id
     """
     article_info: list
     response_status: str
@@ -73,7 +95,7 @@ async def do_article(server_state: "AsyncTCPServer") -> Union[List[str], str]:
         response_status,
         f"Path: {settings.DOMAIN_NAME}",
         f"From: {msg.sender}",
-        f"Newsgroups: {selected_group}",
+        f"Newsgroups: {selected_group.name}",
         f"Date: {msg.created_at.strftime('%a, %d %b %Y %H:%M:%S %Z')}",
         f"Subject: {msg.subject}",
         f"Message-ID: {msg.message_id}",

@@ -4,6 +4,6 @@ async def do_capabilities(_):
         "VERSION 2",
         "IMPLEMENTATION SGUG-MONTTPY",
         "LIST ACTIVE NEWSGROUPS OVERVIEW.FMT SUBSCRIPTIONS",
-        "OVER",
+        "OVER MSGID",
         "READER",
     ]
