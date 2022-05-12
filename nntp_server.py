@@ -4,9 +4,9 @@ from logging import Logger
 from socketserver import ForkingTCPServer
 from typing import List, Optional, Union
 
+import nntp_commands
 from logger import global_logger
 from models import Message, Newsgroup
-from nntp_commands import call_dict
 from settings import settings
 from status_codes import StatusCodes
 from version import get_version
@@ -107,8 +107,11 @@ class AsyncTCPServer:
             command: Optional[str] = tokens.pop(0) if len(tokens) > 0 else None
             self._cmd_args: Optional[list[str]] = tokens
 
-            if command in ["article", "capabilities", "list", "mode", "group", "over", "xover"]:
-                self._send(writer, await call_dict[command](self))
+            if command in nntp_commands.call_dict:
+                self._send(writer, await nntp_commands.call_dict[command](self))
+
+            if command == "quit":
+                self._terminated = True
 
     async def start_serving(self):
         await asyncio.start_server(
