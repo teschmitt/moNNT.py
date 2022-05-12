@@ -24,6 +24,6 @@ async def do_mode(server_state: "AsyncTCPServer") -> str:
         if settings.SERVER_TYPE == "read-only":
             return StatusCodes.STATUS_NOPOSTMODE
         else:
-            return StatusCodes.STATUS_POSTMODE
+            return StatusCodes.STATUS_POSTALLOWED
     elif tokens[0] == "stream":
         return StatusCodes.ERR_NOSTREAM

@@ -1,8 +1,13 @@
 import asyncio
+import datetime
+import uuid
 from asyncio import StreamReader, StreamWriter, Task
+from collections import defaultdict
 from logging import Logger
 from socketserver import ForkingTCPServer
 from typing import List, Optional, Union
+
+from dateutil.parser import parse as date_parse
 
 import nntp_commands
 from logger import global_logger
@@ -31,18 +36,19 @@ class AsyncTCPServer:
         self._cmd_args: Optional[list[str]] = None
         self._selected_group: Optional[Newsgroup] = None  # field to save a selected group
         self._selected_article: Optional[Message] = None  # field to save a selected group
-        # self.sending_article: bool = False
+        self._post_mode: bool = False
+        self._article_buffer: list[str] = []
         # self.auth_username
 
-    def _send(self, writer: StreamWriter, send_obj: Union[List[str], str]) -> None:
+    def _send(self, send_obj: Union[List[str], str]) -> None:
         if type(send_obj) is str:
             self.logger.debug(f"server > {send_obj}")
-            writer.write(f"{send_obj}\r\n".encode(encoding="utf-8"))
+            self.writer.write(f"{send_obj}\r\n".encode(encoding="utf-8"))
         else:
             send_obj.append(".")
             for line in send_obj:
                 self.logger.debug(f"server > {line}")
-                writer.write(f"{line}\r\n".encode(encoding="utf-8"))
+                self.writer.write(f"{line}\r\n".encode(encoding="utf-8"))
 
     async def _accept_client(self, reader: StreamReader, writer: StreamWriter) -> None:
         self.reader: StreamReader = reader
@@ -66,12 +72,10 @@ class AsyncTCPServer:
     async def _handle_client(self, reader, writer) -> None:
         if settings.SERVER_TYPE == "read-only":
             self._send(
-                writer,
                 StatusCodes.STATUS_READYNOPOST % (settings.NNTP_HOSTNAME, get_version()),
             )
         else:
             self._send(
-                writer,
                 StatusCodes.STATUS_READYOKPOST % (settings.NNTP_HOSTNAME, get_version()),
             )
 
@@ -82,6 +86,22 @@ class AsyncTCPServer:
                 incoming_data = await asyncio.wait_for(reader.readline(), timeout=43200.0)
             except TimeoutError as e:
                 self.logger.error(f"ERROR: TimeoutError occurred. {e}")
+                continue
+
+            self.logger.debug(
+                f"{writer.get_extra_info(name='peername')} >"
+                f" {incoming_data.decode(encoding='utf-8').strip()}"
+            )
+
+            if self._post_mode:
+                data_decode = incoming_data.decode(encoding="utf-8").strip()
+                if data_decode == ".":
+                    self.post_mode = False
+                    await self._save_article()
+                    self._article_buffer = []
+                    self._send(StatusCodes.STATUS_POSTSUCCESSFULL)
+                else:
+                    self._article_buffer.append(data_decode)
                 continue
 
             try:
@@ -108,7 +128,7 @@ class AsyncTCPServer:
             self._cmd_args: Optional[list[str]] = tokens
 
             if command in nntp_commands.call_dict:
-                self._send(writer, await nntp_commands.call_dict[command](self))
+                self._send(await nntp_commands.call_dict[command](self))
 
             if command == "quit":
                 self._terminated = True
@@ -127,6 +147,14 @@ class AsyncTCPServer:
         return self._terminated
 
     @property
+    def post_mode(self) -> bool:
+        return self._post_mode
+
+    @post_mode.setter
+    def post_mode(self, val) -> None:
+        self._post_mode = val
+
+    @property
     def selected_group(self) -> Optional[Newsgroup]:
         return self._selected_group
 
@@ -141,3 +169,34 @@ class AsyncTCPServer:
     @selected_article.setter
     def selected_article(self, val) -> None:
         self._selected_article = val
+
+    async def _save_article(self) -> None:
+        # TODO: support cross posting to multiple newsgroups
+        #       this entails setting up a M2M relationship between message and newsgroup
+        #       https://kb.iu.edu/d/affn
+        header: defaultdict[str] = defaultdict(str)
+        line: str = self._article_buffer.pop(0)
+        while len(line) != 0:
+            field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
+            header[field_name.strip().lower()] = field_value.strip()
+            line = self._article_buffer.pop(0)
+
+        group = await Newsgroup.get_or_none(name=header["newsgroups"])
+
+        # we've popped off the complete header, body is just the joined rest
+        body: str = "\n".join(self._article_buffer)
+        print(f"parsed body: {body}")
+        dt: datetime = (
+            date_parse(header["date"]) if len(header["date"]) > 0 else datetime.datetime.utcnow()
+        )
+        print(f"parsed date: {dt}")
+        article = await Message.create(
+            newsgroup=group,
+            sender=header["from"],
+            subject=header["subject"],
+            created_at=dt,
+            updated_at=dt,
+            message_id=f"{uuid.uuid4()}@{settings.DOMAIN_NAME}",
+            body=body,
+        )
+        self.logger.info(f"added article {article} to DB")

@@ -55,19 +55,39 @@ def groupname_filter(groups: list[dict], pattern: str) -> filter:
 
 async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
     """
-    Syntax:
-        LIST
-        LIST ACTIVE [wildmat]
-        LIST ACTIVE.TIMES
-        LIST DISTRIBUTIONS
-        LIST DISTRIB.PATS
-        LIST NEWSGROUPS [wildmat]
-        LIST OVERVIEW.FMT
-        LIST SUBSCRIPTIONS
-        LIST EXTENSIONS (not documented) (done by comparing the results of other servers)
-    Responses:
-        215 list of newsgroups follows
-        503 program error, function not performed
+    7.6.1.1.  Usage
+
+        Indicating capability: LIST
+
+        Syntax
+            LIST [keyword [wildmat|argument]]
+
+        Responses
+            215    Information follows (multi-line)
+
+        Parameters
+            keyword     Information requested [1]
+            argument    Specific to keyword
+            wildmat     Groups of interest
+
+        [1] If no keyword is provided, it defaults to ACTIVE.
+
+    7.6.2.  Standard LIST Keywords
+
+        +--------------+---------------+------------------------------------+
+        | Keyword      | Definition    | Status                             |
+        +--------------+---------------+------------------------------------+
+        | ACTIVE       | Section 7.6.3 | Mandatory if the READER capability |
+        |              |               | is advertised                      |
+        | ACTIVE.TIMES | Section 7.6.4 | Optional                           |
+        | DISTRIB.PATS | Section 7.6.5 | Optional                           |
+        | HEADERS      | Section 8.6   | Mandatory if the HDR capability is |
+        |              |               | advertised                         |
+        | NEWSGROUPS   | Section 7.6.6 | Mandatory if the READER capability |
+        |              |               | is advertised                      |
+        | OVERVIEW.FMT | Section 8.4   | Mandatory if the OVER capability   |
+        |              |               | is advertised                      |
+        +--------------+---------------+------------------------------------+
     """
     tokens: list[str] = server_state.cmd_args
     result_stats: list[str] = []
@@ -77,14 +97,14 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
         # invalid command, return an error-code
         return StatusCodes.ERR_CMDSYNTAXERROR
 
-    if option is None or option == "active":
-        group_stats = get_group_stats()
+    if option is None or option == "active" or option == []:
+        group_stats = await get_group_stats()
         if len(tokens) == 2:
             # a wildmat was passed and there is no sane way to query a modern
             # DB against this sort of pattern since it was created more or less
             # only for NNTP *sheesh*
             pattern: str = tokens[1]
-            group_stats = groupname_filter(await group_stats, pattern)
+            group_stats = groupname_filter(group_stats, pattern)
 
         post_allowed = "y" if settings.SERVER_TYPE == "read-write" else "n"
         result_stats = [StatusCodes.STATUS_LIST]

@@ -34,7 +34,7 @@ class StatusCodes:
     STATUS_NEWNEWS: str = "230 list of new articles by message-id follows"
     STATUS_NOPOSTMODE: str = "201 Hello, you can't post"
     STATUS_OVERVIEWFMT: str = "215 information follows"
-    STATUS_POSTMODE: str = "200 Hello, you can post"
+    STATUS_POSTALLOWED: str = "200 Hello, you can post"
     STATUS_POSTSUCCESSFULL: str = "240 Article received ok"
     STATUS_READONLYSERVER: str = "440 Posting not allowed"
     STATUS_SENDARTICLE: str = "340 Send article to be posted"

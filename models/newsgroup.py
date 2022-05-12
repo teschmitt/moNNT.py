@@ -21,10 +21,11 @@ class Newsgroup(Model):
     description = fields.TextField(null=True)
     status = fields.CharField(max_length=1, default="y")
     default_subscribe = fields.BooleanField(null=False, default=True)
+    # seq = fields.IntField(null=False, default=0)
     created_at = fields.DatetimeField(auto_now_add=True, null=False)
     updated_at = fields.DatetimeField(auto_now=True, null=False)
 
-    messages: fields.ReverseRelation["Message"]
+    messages: fields.ReverseRelation["Message"]  # noqa: F821
 
     class Meta:
         ordering = ["name"]
