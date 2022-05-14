@@ -6,7 +6,9 @@ logger = global_logger(__name__)
 from nntp_commands import (  # noqa: E402
     article,
     capabilities,
+    date,
     group,
+    help,
     list,
     mode,
     over,
@@ -17,7 +19,9 @@ from nntp_commands import (  # noqa: E402
 call_dict = {
     "article": article.do_article,
     "capabilities": capabilities.do_capabilities,
+    "date": date.do_date,
     "group": group.do_group,
+    "help": help.do_help,
     "list": list.do_list,
     "mode": mode.do_mode,
     "over": over.do_over,

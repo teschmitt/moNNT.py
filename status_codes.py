@@ -26,7 +26,7 @@ class StatusCodes:
     STATUS_AUTH_REQUIRED: str = "480 Authentication required"
     STATUS_CLOSING: str = "205 closing connection - goodbye!"
     STATUS_EXTENSIONS: str = "215 Extensions supported by server."
-    STATUS_HELPMSG: str = "100 help text follows"
+    STATUS_HELPMSG: str = "100 Help text follows (multi-line)"
     STATUS_LIST: str = "215 list of newsgroups follows"
     STATUS_LISTNEWSGROUPS: str = "215 information follows"
     STATUS_LISTSUBSCRIPTIONS: str = "215 list of default newsgroups follows"
@@ -49,7 +49,7 @@ class StatusCodes:
     ERR_TIMEOUT: str = "503 Timeout after %s seconds, closing connection."
     STATUS_ARTICLE: str = "220 %s %s All of the article follows"
     STATUS_BODY: str = "222 %s %s article retrieved - body follows"
-    STATUS_DATE: str = "111 %s"
+    STATUS_DATE: Template = Template("111 $date")
     STATUS_GROUPSELECTED: Template = Template("211 $count $first $last $name group selected")
     STATUS_HEAD: str = "221 %s %s article retrieved - head follows"
     STATUS_LISTGROUP: str = "211 %s %s %s %s"
