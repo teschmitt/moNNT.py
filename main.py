@@ -14,7 +14,7 @@ async def init_db():
 
 
 if __name__ == "__main__":
-    logger = global_logger(__name__)
+    logger = global_logger()
 
     logger.info(f"moNNT.py Usenet Server {get_version()}")
     run_async(init_db())

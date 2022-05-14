@@ -6,6 +6,6 @@ from logging.config import fileConfig
 fileConfig("logging_conf.ini")
 
 
-def global_logger(name: str) -> logging.Logger:
+def global_logger() -> logging.Logger:
     fileConfig("logging_conf.ini")
-    return logging.getLogger(name=name)
+    return logging.getLogger()

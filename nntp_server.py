@@ -30,7 +30,7 @@ class AsyncTCPServer:
         self.reader: StreamReader
         self.writer: StreamWriter
         self.clients: dict = {}
-        self.logger: Logger = global_logger(__name__)
+        self.logger: Logger = global_logger()
         self._terminated: bool = False
         self._empty_token_counter: int = 0
         self._cmd_args: Optional[list[str]] = None

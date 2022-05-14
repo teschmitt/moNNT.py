@@ -1,6 +1,6 @@
 from logger import global_logger
 
-logger = global_logger(__name__)
+logger = global_logger()
 
 
 from nntp_commands import (  # noqa: E402

@@ -12,7 +12,7 @@ from status_codes import StatusCodes
 if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
 
-logger = global_logger(__name__)
+logger = global_logger()
 
 overview_headers = (
     "Subject:",
