@@ -99,10 +99,13 @@ class AsyncTCPServer:
             if self._post_mode:
                 data_decode = incoming_data.decode(encoding="utf-8").strip()
                 if data_decode == ".":
-                    await self._save_article()
-                    self.post_mode = False
-                    self._article_buffer = []
-                    self._send(StatusCodes.STATUS_POSTSUCCESSFULL)
+                    try:
+                        self.post_mode = False
+                        self._article_buffer = []
+                        await self._save_article()
+                        self._send(StatusCodes.STATUS_POSTSUCCESSFULL)
+                    except:  # noqa E722
+                        self._send(StatusCodes.ERR_NOTPERFORMED)
                 else:
                     self._article_buffer.append(data_decode)
                 continue

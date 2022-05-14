@@ -45,10 +45,10 @@ class Message(Model):
 
     def __str__(self):
         return (
-            f"Newsgroup: {self.newsgroup}\n"
+            f"Newsgroup: {self.newsgroup.name}\n"
             f"Sender: {self.sender}\n"
             f"Created: {self.created_at}        \n"
-            f"Message ID: {self.message_id}\n"
+            f"Message ID: <{self.message_id}>\n"
             f"Subject: {self.subject}\n"
             "---------------------------------------------------------\n"
             f"{self.body}\n"
