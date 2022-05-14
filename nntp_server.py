@@ -99,8 +99,8 @@ class AsyncTCPServer:
             if self._post_mode:
                 data_decode = incoming_data.decode(encoding="utf-8").strip()
                 if data_decode == ".":
-                    self.post_mode = False
                     await self._save_article()
+                    self.post_mode = False
                     self._article_buffer = []
                     self._send(StatusCodes.STATUS_POSTSUCCESSFULL)
                 else:
@@ -178,8 +178,13 @@ class AsyncTCPServer:
         header: defaultdict[str] = defaultdict(str)
         line: str = self._article_buffer.pop(0)
         while len(line) != 0:
-            field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
-            header[field_name.strip().lower()] = field_value.strip()
+            try:
+                field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
+                header[field_name.strip().lower()] = field_value.strip()
+            except ValueError:
+                # some clients - yes, I'm looking at you, Thunderbird - split a single header entry
+                # into multiple lines. This behaviour will not be tolerated by moNNT.py!
+                pass
             line = self._article_buffer.pop(0)
 
         group = await Newsgroup.get_or_none(name=header["newsgroups"])
