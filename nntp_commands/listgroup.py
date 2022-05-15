@@ -49,6 +49,7 @@ async def do_listgroup(server_state: "AsyncTCPServer") -> Union[list[str], str]:
     num_range: Optional[str] = tokens[1] if len(tokens) > 1 else None
     result: list[str]
     msgs: list[Message]
+    status_str: str
 
     if group_name is not None:
         # group name provided, so select the group
@@ -73,11 +74,15 @@ async def do_listgroup(server_state: "AsyncTCPServer") -> Union[list[str], str]:
         )
 
     ids: list[int] = [msg.id for msg in msgs]
-    result = [
-        StatusCodes.STATUS_LISTGROUP.substitute(
+    if len(ids) > 0:
+        status_str = StatusCodes.STATUS_LISTGROUP.substitute(
             number=len(msgs), low=min(ids), high=max(ids), group=server_state.selected_group.name
         )
-    ]
-    result.extend(map(str, ids))
+        result = [status_str] + list(map(str, ids))
+    else:
+        status_str = StatusCodes.STATUS_LISTGROUP.substitute(
+            number=len(msgs), low=0, high=0, group=server_state.selected_group.name
+        )
+        result = [status_str]
 
     return result
