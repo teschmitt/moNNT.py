@@ -97,7 +97,7 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
         # invalid command, return an error-code
         return StatusCodes.ERR_CMDSYNTAXERROR
 
-    if option is None or option == "active" or option == []:
+    if option is None or option == "active" or len(option) == 0:
         group_stats = await get_group_stats()
         if len(tokens) == 2:
             # a wildmat was passed and there is no sane way to query a modern
@@ -112,9 +112,7 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
             [f"{g['name']} {g['max']} {g['min']} {post_allowed}" for g in group_stats]
         )
     else:
-        if option == "active":
-            group_stats = get_group_stats()
-        elif option == "overview.fmt":
+        if option == "overview.fmt":
             result_stats = [StatusCodes.STATUS_OVERVIEWFMT]
             result_stats.extend(overview_headers)
         elif option == "extensions":

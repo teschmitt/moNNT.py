@@ -60,6 +60,12 @@ class AsyncTCPServer:
         def client_done(tsk: asyncio.Task):
             del self.clients[tsk]
             writer.close()
+            self._empty_token_counter = 0
+            self._cmd_args = None
+            self._selected_group = None
+            self._selected_article = None
+            self._post_mode = False
+            self._article_buffer = []
             self.logger.info("End Connection")
 
         task.add_done_callback(client_done)

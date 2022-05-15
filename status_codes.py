@@ -52,7 +52,7 @@ class StatusCodes:
     STATUS_DATE: Template = Template("111 $date")
     STATUS_GROUPSELECTED: Template = Template("211 $count $first $last $name group selected")
     STATUS_HEAD: str = "221 %s %s article retrieved - head follows"
-    STATUS_LISTGROUP: str = "211 %s %s %s %s"
+    STATUS_LISTGROUP: Template = Template("211 $number $low $high $group")
     STATUS_READYNOPOST: str = "201 %s moNNT.py %s server ready (no posting allowed)"
     STATUS_READYOKPOST: str = "200 %s moNNT.py %s server ready (posting allowed)"
     STATUS_STAT: str = "223 %s %s article retrieved - request text separately"

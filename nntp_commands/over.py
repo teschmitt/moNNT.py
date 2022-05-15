@@ -5,6 +5,7 @@ from tortoise.queryset import QuerySet
 from models import Message, Newsgroup
 from settings import settings
 from status_codes import StatusCodes
+from utils import ParsedRange, RangeParseStatus
 
 if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
@@ -58,8 +59,6 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
         article_list = [selected_article]
     elif len(options) == 1:
         arg: str = options[0]
-        range_start: int = 0
-        range_stop: int = 2**63
 
         if "<" in arg and ">" in arg:
             article_list = [
@@ -71,23 +70,11 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
             if server_state.selected_group is None:
                 return StatusCodes.ERR_NOGROUPSELECTED
 
-            if "-" in arg:
-                # parse range
-                str_start, str_stop = arg.split("-")
-                try:
-                    range_start = int(str_start)
-                    if len(str_stop) > 0:
-                        range_stop = int(str_stop)
-                except ValueError:
-                    return StatusCodes.ERR_NOTPERFORMED
-            else:
-                # single message number
-                try:
-                    range_start = range_stop = int(arg)
-                except ValueError:
-                    return StatusCodes.ERR_NOTPERFORMED
+            parsed_range: ParsedRange = ParsedRange(range_str=arg, max_value=2**63)
+            if parsed_range.parse_status == RangeParseStatus.FAILURE:
+                return StatusCodes.ERR_NOTPERFORMED
 
-            article_list = await get_messages(selected_group, range_start, range_stop)
+            article_list = await get_messages(selected_group, parsed_range.start, parsed_range.stop)
             if len(article_list) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLENUM
 
