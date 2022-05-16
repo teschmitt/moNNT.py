@@ -88,7 +88,7 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
                 msg.id,
                 msg.subject,
-                msg.sender,
+                msg.from_,
                 msg.created_at.strftime("%a, %d %b %Y %H:%M:%S %Z"),
                 msg.message_id,
                 "",

@@ -205,11 +205,11 @@ class AsyncTCPServer:
         )
         article = await Message.create(
             newsgroup=group,
-            sender=header["from"],
+            from_=header["from"],
             subject=header["subject"],
             created_at=dt,
             updated_at=dt,
-            message_id=f"{uuid.uuid4()}@{settings.DOMAIN_NAME}",
+            message_id=f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
             body=body,
         )
         self.logger.info(f"added article {article} to DB")
