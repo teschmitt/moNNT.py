@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 
 
 def get_messages(group: Newsgroup, start: int, stop: int) -> QuerySet[Message]:
-    return Message.filter(newsgroup__name=group.name, id__gte=start, id__lte=stop)
+    return Message.filter(newsgroup__name=group.name, id__gte=start, id__lte=stop).order_by(
+        "created_at"
+    )
 
 
 async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
@@ -74,7 +76,12 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
             if parsed_range.parse_status == RangeParseStatus.FAILURE:
                 return StatusCodes.ERR_NOTPERFORMED
 
-            article_list = await get_messages(selected_group, parsed_range.start, parsed_range.stop)
+            try:
+                article_list = await get_messages(
+                    selected_group, parsed_range.start, parsed_range.stop
+                )
+            except Exception as e:
+                print(e)
             if len(article_list) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLENUM
 
@@ -82,7 +89,7 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     for msg in article_list:
         body = msg.body
         num_lines = len(body.split("\n"))
-        xref = "Xref: %s %s:%s" % (settings.DOMAIN_NAME, selected_group, msg.id)
+        xref = f"Xref: {settings.DOMAIN_NAME} {selected_group.name}:{msg.id}"
 
         headers.append(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
@@ -91,7 +98,7 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
                 msg.from_,
                 msg.created_at.strftime("%a, %d %b %Y %H:%M:%S %Z"),
                 msg.message_id,
-                "",
+                msg.references,
                 len(body),
                 num_lines,
                 xref,

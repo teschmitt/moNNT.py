@@ -24,7 +24,7 @@ class Message(Model):
 
     # mandatory headers
     from_ = fields.CharField(source_field="from", max_length=255, null=False)
-    created_at = fields.DatetimeField(null=False)
+    created_at = fields.DatetimeField(auto_now_add=True, null=False)
     subject = fields.CharField(max_length=255, null=False)
     message_id = fields.CharField(max_length=255, null=False)
     path = fields.TextField(null=False)
@@ -38,7 +38,7 @@ class Message(Model):
     reply_to = fields.CharField(max_length=255, null=True)
     organization = fields.CharField(max_length=255, null=True)
     x_ref = fields.CharField(max_length=255, null=True)
-    x_newsreader = fields.CharField(max_length=255, null=True)
+    user_agent = fields.CharField(max_length=255, null=True)
 
     # more on getting the complete relationship tree here:
     # https://tortoise-orm.readthedocs.io/en/latest/examples/basic.html

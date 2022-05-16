@@ -106,12 +106,13 @@ class AsyncTCPServer:
                 data_decode = incoming_data.decode(encoding="utf-8").strip()
                 if data_decode == ".":
                     try:
-                        self.post_mode = False
-                        self._article_buffer = []
                         await self._save_article()
                         self._send(StatusCodes.STATUS_POSTSUCCESSFULL)
-                    except:  # noqa E722
+                    except Exception as e:  # noqa E722
+                        self.logger.error(e)
                         self._send(StatusCodes.ERR_NOTPERFORMED)
+                    self.post_mode = False
+                    self._article_buffer = []
                 else:
                     self._article_buffer.append(data_decode)
                 continue
@@ -186,13 +187,18 @@ class AsyncTCPServer:
         #       https://kb.iu.edu/d/affn
         header: defaultdict[str] = defaultdict(str)
         line: str = self._article_buffer.pop(0)
+        field_name: str = ""
+        field_value: str
         while len(line) != 0:
             try:
-                field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
-                header[field_name.strip().lower()] = field_value.strip()
+                if ":" in line:
+                    field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
+                    field_name = field_name.strip().lower()
+                    header[field_name] = field_value.strip()
+                elif len(field_name) > 0:
+                    header[field_name] = f"{header[field_name]} {line}"
             except ValueError:
-                # some clients - yes, I'm looking at you, Thunderbird - split a single header entry
-                # into multiple lines. This behaviour will not be tolerated by moNNT.py!
+                # something clients send fishy headers … we'll just ignore them.
                 pass
             line = self._article_buffer.pop(0)
 
@@ -208,8 +214,12 @@ class AsyncTCPServer:
             from_=header["from"],
             subject=header["subject"],
             created_at=dt,
-            updated_at=dt,
             message_id=f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
             body=body,
+            path=f"!{settings.DOMAIN_NAME}",
+            references=header["references"],
+            reply_to=header["reply-to"],
+            organization=header["organization"],
+            user_agent=header["user-agent"],
         )
         self.logger.info(f"added article {article} to DB")

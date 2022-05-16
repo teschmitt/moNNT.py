@@ -100,7 +100,10 @@ async def do_article(server_state: "AsyncTCPServer") -> Union[List[str], str]:
         f"Subject: {msg.subject}",
         f"Message-ID: {msg.message_id}",
         f"Xref: {settings.DOMAIN_NAME} {selected_group.name}:{msg.id}",
-        "References: ",
+        f"References: {msg.references}",
+        f"Path: {msg.path}",
+        f"Organization: {msg.organization}",
+        f"User-Agent: {msg.user_agent}",
         "",
         f"{msg.body}",
     ]

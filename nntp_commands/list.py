@@ -1,12 +1,10 @@
 from fnmatch import fnmatch
 from typing import TYPE_CHECKING, Optional, Union
 
-from tortoise.functions import Count, Max, Min
-from tortoise.queryset import ValuesQuery
+from tortoise.functions import Max, Min
 
 from logger import global_logger
-from models import Message, Newsgroup
-from settings import settings
+from models import Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
@@ -20,8 +18,8 @@ overview_headers = (
     "Date:",
     "Message-ID:",
     "References:",
-    "Bytes:",
-    "Lines:",
+    ":bytes",
+    ":lines",
     "Xref:full",
 )
 
@@ -38,15 +36,6 @@ extensions = (
     "XROVER",
     "XVERSION",
 )
-
-
-def get_group_stats() -> ValuesQuery:
-    return (
-        Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
-        .group_by("newsgroup__id")
-        .order_by("newsgroup__name")
-        .values(name="newsgroup__name", count="count", min="min", max="max")
-    )
 
 
 def groupname_filter(groups: list[dict], pattern: str) -> filter:
@@ -98,7 +87,11 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
         return StatusCodes.ERR_CMDSYNTAXERROR
 
     if option is None or option == "active" or len(option) == 0:
-        group_stats = await get_group_stats()
+        group_stats = (
+            await Newsgroup.annotate(high=Max("messages__id"), low=Min("messages__id"))
+            .order_by("name")
+            .values("high", "low", "name", "status")
+        )
         if len(tokens) == 2:
             # a wildmat was passed and there is no sane way to query a modern
             # DB against this sort of pattern since it was created more or less
@@ -106,10 +99,13 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
             pattern: str = tokens[1]
             group_stats = groupname_filter(group_stats, pattern)
 
-        post_allowed = "y" if settings.SERVER_TYPE == "read-write" else "n"
         result_stats = [StatusCodes.STATUS_LIST]
         result_stats.extend(
-            [f"{g['name']} {g['max']} {g['min']} {post_allowed}" for g in group_stats]
+            [
+                f"{g['name']} {g['high'] if g['high'] is not None else '0'} "
+                f"{g['low'] if g['low'] is not None else '0'} {g['status']}"
+                for g in group_stats
+            ]
         )
     else:
         if option == "overview.fmt":
