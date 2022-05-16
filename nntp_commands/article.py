@@ -98,7 +98,7 @@ async def do_article(server_state: "AsyncTCPServer") -> Union[List[str], str]:
         f"Newsgroups: {selected_group.name}",
         f"Date: {msg.created_at.strftime('%a, %d %b %Y %H:%M:%S %Z')}",
         f"Subject: {msg.subject}",
-        f"Message-ID: {msg.message_id}",
+        f"Message-ID: <{msg.message_id}>",
         f"Xref: {settings.DOMAIN_NAME} {selected_group}:{msg.id}",
         "References: ",
         "",
