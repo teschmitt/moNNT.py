@@ -14,7 +14,7 @@ from logger import global_logger
 from models import Message, Newsgroup
 from settings import settings
 from status_codes import StatusCodes
-from version import get_version
+from utils import get_version
 
 
 class NNTPServer(ForkingTCPServer):

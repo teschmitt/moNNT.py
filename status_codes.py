@@ -1,6 +1,6 @@
 from string import Template
 
-from version import get_version
+from utils import get_version
 
 
 class StatusCodes:
@@ -55,4 +55,6 @@ class StatusCodes:
     STATUS_LISTGROUP: Template = Template("211 $number $low $high $group")
     STATUS_READYNOPOST: str = "201 %s moNNT.py %s server ready (no posting allowed)"
     STATUS_READYOKPOST: str = "200 %s moNNT.py %s server ready (posting allowed)"
-    STATUS_STAT: str = "223 %s %s article retrieved - request text separately"
+    STATUS_STAT: Template = Template(
+        "223 $number $msg_id article retrieved - request text separately"
+    )

@@ -5,7 +5,7 @@ from tortoise import Tortoise, run_async
 from logger import global_logger
 from nntp_server import AsyncTCPServer
 from settings import settings
-from version import get_version
+from utils import get_version
 
 
 async def init_db():
