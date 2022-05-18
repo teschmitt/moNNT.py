@@ -27,9 +27,14 @@ async def do_group(server_state: "AsyncTCPServer") -> str:
     if len(tokens) != 1:
         return StatusCodes.ERR_CMDSYNTAXERROR
 
-    server_state.selected_group = await Newsgroup.get_or_none(name=tokens[0])
-    if server_state.selected_group is None:
+    new_group: Optional[Newsgroup] = await Newsgroup.get_or_none(name=tokens[0])
+    if new_group is None:
         return StatusCodes.ERR_NOSUCHGROUP
+    server_state.selected_group = new_group
+    # if the selected group is empty, filter.first() will return None so this is RFC-compliant:
+    server_state.selected_article = (
+        await Message.filter(newsgroup=server_state.selected_group).order_by("id").first()
+    )
     group_stats: Optional[dict] = (
         await Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
         .group_by("newsgroup__id")
