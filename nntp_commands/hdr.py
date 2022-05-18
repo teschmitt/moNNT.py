@@ -13,17 +13,6 @@ from utils import (
 if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
 
-overview_headers = (
-    "Subject:",
-    "From:",
-    "Date:",
-    "Message-ID:",
-    "References:",
-    ":bytes",
-    ":lines",
-    "Xref:full",
-)
-
 
 async def augment_article(art: Message) -> Message:
     await art.fetch_related("newsgroup")
@@ -42,6 +31,8 @@ def get_header(art: Message, field_name: str) -> str:
         return art.message_id
     elif fn == "references":
         return art.references
+    elif fn == "newsgroups":
+        return art.newsgroup.name
     elif fn == ":bytes":
         return str(get_bytes_len(art))
     elif fn == ":lines":

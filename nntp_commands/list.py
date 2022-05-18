@@ -32,6 +32,7 @@ list_headers = (
     ":bytes",
     ":lines",
     "Xref",
+    "Newsgroups",
 )
 
 
