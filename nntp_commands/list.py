@@ -23,6 +23,18 @@ overview_headers = (
     "Xref:full",
 )
 
+list_headers = (
+    "Subject",
+    "From",
+    "Date",
+    "Message-ID",
+    "References",
+    ":bytes",
+    ":lines",
+    "Xref",
+)
+
+
 extensions = (
     "XOVER",
     "XPAT",
@@ -111,6 +123,9 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
         if option == "overview.fmt":
             result_stats = [StatusCodes.STATUS_OVERVIEWFMT]
             result_stats.extend(overview_headers)
+        elif option == "headers":
+            result_stats = [StatusCodes.STATUS_OVERVIEWFMT]
+            result_stats.extend(list_headers)
         elif option == "extensions":
             result_stats = [StatusCodes.STATUS_EXTENSIONS]
             result_stats.extend(extensions)

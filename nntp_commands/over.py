@@ -3,9 +3,14 @@ from typing import TYPE_CHECKING, List, Optional, Union
 from tortoise.queryset import QuerySet
 
 from models import Message, Newsgroup
-from settings import settings
 from status_codes import StatusCodes
-from utils import ParsedRange, RangeParseStatus
+from utils import (
+    ParsedRange,
+    RangeParseStatus,
+    build_xref,
+    get_bytes_len,
+    get_num_lines,
+)
 
 if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
@@ -63,9 +68,7 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
         arg: str = options[0]
 
         if "<" in arg and ">" in arg:
-            article_list = [
-                await Message.get_or_none(message_id=arg.replace("<", "").replace(">", ""))
-            ]
+            article_list = [await Message.get_or_none(message_id=arg)]
             if len(article_list) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLE
         else:
@@ -85,26 +88,22 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
             if len(article_list) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLENUM
 
-    headers = []
+    headers: list[str] = []
     for msg in article_list:
-        body = msg.body
-        num_lines = len(body.split("\n"))
-        xref = f"Xref: {settings.DOMAIN_NAME} {selected_group.name}:{msg.id}"
-
+        references: str = msg.references if msg.references is not None else ""
         headers.append(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
-                msg.id,
-                msg.subject,
-                msg.from_,
-                msg.created_at.strftime("%a, %d %b %Y %H:%M:%S %Z"),
-                msg.message_id,
-                msg.references,
-                len(body),
-                num_lines,
-                xref,
+            "\t".join(
+                [
+                    str(msg.id),
+                    msg.subject,
+                    msg.from_,
+                    msg.created_at.strftime("%a, %d %b %Y %H:%M:%S %Z"),
+                    msg.message_id,
+                    references,
+                    str(get_bytes_len(msg)),
+                    str(get_num_lines(msg)),
+                    f"Xref: {build_xref(article_id=msg.id, group_name=selected_group.name)}",
+                ]
             )
         )
-    result = "%s\r\n%s\r\n." % (StatusCodes.STATUS_XOVER, "\r\n".join(headers))
-    # result = [StatusCodes.STATUS_XOVER]
-    # result.extend(headers)
-    return result
+    return [StatusCodes.STATUS_XOVER] + headers

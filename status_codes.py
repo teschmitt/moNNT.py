@@ -17,6 +17,7 @@ class StatusCodes:
     ERR_NOSTREAM: str = "500 Command not understood"
     ERR_NOSUCHARTICLE: str = "430 no such article"
     ERR_NOSUCHARTICLENUM: str = "423 no such article in this group"
+    ERR_NOARTICLESINRANGE: str = "423 No articles in that range"
     ERR_NOSUCHGROUP: str = "411 no such news group"
     ERR_NOTCAPABLE: str = "500 command not recognized"
     ERR_NOTPERFORMED: str = "503 program error, function not performed"
@@ -26,6 +27,7 @@ class StatusCodes:
     STATUS_AUTH_REQUIRED: str = "480 Authentication required"
     STATUS_CLOSING: str = "205 closing connection - goodbye!"
     STATUS_EXTENSIONS: str = "215 Extensions supported by server."
+    STATUS_HEADERS_FOLLOW: str = "225 Headers follow (multi-line)"
     STATUS_HELPMSG: str = "100 Help text follows (multi-line)"
     STATUS_LIST: str = "215 list of newsgroups follows"
     STATUS_LISTNEWSGROUPS: str = "215 information follows"
@@ -48,10 +50,10 @@ class StatusCodes:
     # string templates
     ERR_TIMEOUT: str = "503 Timeout after %s seconds, closing connection."
     STATUS_ARTICLE: str = "220 %s %s All of the article follows"
-    STATUS_BODY: str = "222 %s %s article retrieved - body follows"
+    STATUS_BODY: Template = Template("222 $number $message_id article retrieved - body follows")
     STATUS_DATE: Template = Template("111 $date")
     STATUS_GROUPSELECTED: Template = Template("211 $count $first $last $name group selected")
-    STATUS_HEAD: str = "221 %s %s article retrieved - head follows"
+    STATUS_HEAD: Template = Template("221 $number $message_id article retrieved - head follows")
     STATUS_LISTGROUP: Template = Template("211 $number $low $high $group")
     STATUS_READYNOPOST: str = "201 %s moNNT.py %s server ready (no posting allowed)"
     STATUS_READYOKPOST: str = "200 %s moNNT.py %s server ready (posting allowed)"

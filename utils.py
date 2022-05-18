@@ -3,6 +3,9 @@ import re
 from enum import Enum
 from pathlib import Path
 
+from models import Message
+from settings import settings
+
 
 class RangeParseStatus(Enum):
     SUCCESS = 0
@@ -59,3 +62,19 @@ def get_version():
                     version = ver.group(1).strip()
                     break
     return version
+
+
+def build_xref(article_id: int, group_name: str) -> str:
+    return f"{settings.DOMAIN_NAME} {group_name}:{article_id}"
+
+
+def get_bytes_len(article: Message) -> int:
+    result = 0
+    for val in article.__dict__.values():
+        if type(val) is not bool:
+            result += len(str(val).encode("utf-8"))
+    return result
+
+
+def get_num_lines(article: Message) -> int:
+    return len(article.body.split("\n"))

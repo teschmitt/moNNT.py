@@ -38,6 +38,7 @@ class AsyncTCPServer:
         self._selected_article: Optional[Message] = None  # field to save a selected group
         self._post_mode: bool = False
         self._article_buffer: list[str] = []
+        self._command: Optional[str]
         # self.auth_username
 
     def _send(self, send_obj: Union[List[str], str]) -> None:
@@ -66,6 +67,7 @@ class AsyncTCPServer:
             self._selected_article = None
             self._post_mode = False
             self._article_buffer = []
+            self._command = None
             self.logger.info("End Connection")
 
         task.add_done_callback(client_done)
@@ -135,13 +137,13 @@ class AsyncTCPServer:
             else:
                 self._empty_token_counter = 0
 
-            command: Optional[str] = tokens.pop(0) if len(tokens) > 0 else None
+            self._command = tokens.pop(0) if len(tokens) > 0 else None
             self._cmd_args: Optional[list[str]] = tokens
 
-            if command in nntp_commands.call_dict:
-                self._send(await nntp_commands.call_dict[command](self))
+            if self._command in nntp_commands.call_dict:
+                self._send(await nntp_commands.call_dict[self._command](self))
 
-            if command == "quit":
+            if self._command == "quit":
                 self._terminated = True
 
     async def start_serving(self):
@@ -152,6 +154,10 @@ class AsyncTCPServer:
     @property
     def cmd_args(self) -> Optional[list[str]]:
         return self._cmd_args
+
+    @property
+    def command(self) -> Optional[str]:
+        return self._command
 
     @property
     def terminated(self) -> bool:
