@@ -83,16 +83,23 @@ def get_num_lines(article: Message) -> int:
 
 
 def groupname_filter(groups: list[dict], pattern: str) -> filter:
+    """
+    A very incomplete wildmat implementation.
+
+    :param groups: groups to filter
+    :param pattern: pattern to filter with
+    :return: filter object containing matching newsgroups
+    """
     return filter(lambda v: fnmatch(v["name"], pattern), groups)
 
 
-def get_datetime(tokens):
-    year: int = int(tokens[0][0:4]) if len(tokens[0]) > 6 else int(tokens[0][0:2])
-    month: int = int(tokens[0][4:6]) if len(tokens[0]) > 6 else int(tokens[0][2:4])
-    day: int = int(tokens[0][6:8]) if len(tokens[0]) > 6 else int(tokens[0][4:6])
-    hour: int = int(tokens[1][:2])
-    minute: int = int(tokens[0][2:4])
-    second: int = int(tokens[0][4:6])
+def get_datetime(date_str: str, time_str: str):
+    year: int = int(date_str[0:4]) if len(date_str) > 6 else int(date_str[0:2])
+    month: int = int(date_str[4:6]) if len(date_str) > 6 else int(date_str[2:4])
+    day: int = int(date_str[6:8]) if len(date_str) > 6 else int(date_str[4:6])
+    hour: int = int(time_str[:2])
+    minute: int = int(time_str[2:4])
+    second: int = int(time_str[4:6])
     gte_date: datetime = datetime(
         year=year,
         month=month,

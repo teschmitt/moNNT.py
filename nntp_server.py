@@ -141,7 +141,11 @@ class AsyncTCPServer:
             self._cmd_args: Optional[list[str]] = tokens
 
             if self._command in nntp_commands.call_dict:
-                self._send(await nntp_commands.call_dict[self._command](self))
+                try:
+                    self._send(await nntp_commands.call_dict[self._command](self))
+                except Exception as e:
+                    self.logger.exception(e)
+                    self._terminated = True
 
             if self._command == "quit":
                 self._terminated = True

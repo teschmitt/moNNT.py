@@ -33,7 +33,7 @@ class StatusCodes:
     STATUS_LISTNEWSGROUPS: str = "215 information follows"
     STATUS_LISTSUBSCRIPTIONS: str = "215 list of default newsgroups follows"
     STATUS_NEWGROUPS: str = "231 list of new newsgroups follows"
-    STATUS_NEWNEWS: str = "230 list of new articles by message-id follows"
+    STATUS_NEWNEWS: str = "230 List of new articles follows (multi-line)"
     STATUS_NOPOSTMODE: str = "201 Hello, you can't post"
     STATUS_OVERVIEWFMT: str = "215 information follows"
     STATUS_POSTALLOWED: str = "200 Hello, you can post"

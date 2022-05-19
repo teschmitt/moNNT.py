@@ -1,4 +1,3 @@
-from fnmatch import fnmatch
 from typing import TYPE_CHECKING, Optional, Union
 
 from tortoise.functions import Max, Min
@@ -6,6 +5,7 @@ from tortoise.functions import Max, Min
 from logger import global_logger
 from models import Newsgroup
 from status_codes import StatusCodes
+from utils import groupname_filter
 
 if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
@@ -49,10 +49,6 @@ extensions = (
     "XROVER",
     "XVERSION",
 )
-
-
-def groupname_filter(groups: list[dict], pattern: str) -> filter:
-    return filter(lambda v: fnmatch(v["name"], pattern), groups)
 
 
 async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
@@ -143,8 +139,6 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
                 # DB against this sort of pattern since it was created more or less
                 # only for NNTP *sheesh*
                 pattern: str = tokens[1]
-                # pattern.replace("*", ".*").replace("?", ".*")
-                # query = query.filter(name__search=pattern)
                 groups = groupname_filter(groups, pattern)
             result_stats.extend([f"{g['name']} {g['description']}" for g in groups])
         else:

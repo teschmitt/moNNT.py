@@ -27,11 +27,11 @@ async def do_newgroups(server_state: "AsyncTCPServer") -> Union[list[str], str]:
             time    Time in hhmmss format
     """
     tokens: list[str] = server_state.cmd_args
-    if len(tokens) > 3 or tokens[2] != "GMT":
+    if len(tokens) > 3 or (len(tokens) == 3 and tokens[2] != "gmt"):
         # invalid command, return an error-code
         return StatusCodes.ERR_CMDSYNTAXERROR
     try:
-        gte_date = get_datetime(tokens)
+        gte_date = get_datetime(date_str=tokens[0], time_str=tokens[1])
     except (IndexError, ValueError):
         return StatusCodes.ERR_CMDSYNTAXERROR
     # tz_: Optional[str] = tokens[2] if len(tokens) == 3 else None
