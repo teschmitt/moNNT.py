@@ -105,7 +105,7 @@ class AsyncTCPServer:
             )
 
             if self._post_mode:
-                data_decode = incoming_data.decode(encoding="utf-8").strip()
+                data_decode = incoming_data.decode(encoding="utf-8").rstrip()
                 if data_decode == ".":
                     try:
                         await self._save_article()
