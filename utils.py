@@ -1,6 +1,8 @@
 import os
 import re
+from datetime import datetime, timezone
 from enum import Enum
+from fnmatch import fnmatch
 from pathlib import Path
 
 from models import Message
@@ -78,3 +80,26 @@ def get_bytes_len(article: Message) -> int:
 
 def get_num_lines(article: Message) -> int:
     return len(article.body.split("\n"))
+
+
+def groupname_filter(groups: list[dict], pattern: str) -> filter:
+    return filter(lambda v: fnmatch(v["name"], pattern), groups)
+
+
+def get_datetime(tokens):
+    year: int = int(tokens[0][0:4]) if len(tokens[0]) > 6 else int(tokens[0][0:2])
+    month: int = int(tokens[0][4:6]) if len(tokens[0]) > 6 else int(tokens[0][2:4])
+    day: int = int(tokens[0][6:8]) if len(tokens[0]) > 6 else int(tokens[0][4:6])
+    hour: int = int(tokens[1][:2])
+    minute: int = int(tokens[0][2:4])
+    second: int = int(tokens[0][4:6])
+    gte_date: datetime = datetime(
+        year=year,
+        month=month,
+        day=day,
+        hour=hour,
+        minute=minute,
+        second=second,
+        tzinfo=timezone.utc,
+    )
+    return gte_date
