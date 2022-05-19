@@ -45,4 +45,4 @@ async def do_next(server_state: "AsyncTCPServer") -> str:
 
     server_state.selected_article = msg
 
-    return StatusCodes.STATUS_STAT.substitute(number=msg.id, msg_id=f"<{msg.message_id}>")
+    return StatusCodes.STATUS_NEXTLAST.substitute(number=msg.id, message_id=msg.message_id)
