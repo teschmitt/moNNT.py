@@ -1,3 +1,6 @@
+from utils import get_version
+
+
 async def do_capabilities(_):
     """
     5.2.1.  Usage
@@ -14,8 +17,9 @@ async def do_capabilities(_):
     return [
         "101 Capability list:",
         "VERSION 2",
-        "IMPLEMENTATION MONTTPY",
+        f"IMPLEMENTATION moNNT.py Async Usenet Server v{get_version()}",
         "LIST ACTIVE NEWSGROUPS OVERVIEW.FMT SUBSCRIPTIONS",
         "OVER MSGID",
+        "HDR",
         "READER",
     ]
