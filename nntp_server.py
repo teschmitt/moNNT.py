@@ -105,6 +105,7 @@ class AsyncTCPServer:
             )
 
             if self._post_mode:
+                # only rstrip in order to preserve indentation in body
                 data_decode = incoming_data.decode(encoding="utf-8").rstrip()
                 if data_decode == ".":
                     try:
@@ -146,6 +147,9 @@ class AsyncTCPServer:
                 except Exception as e:
                     self.logger.exception(e)
                     self._terminated = True
+            else:
+                # command is not in list of implemented capabilities
+                self._send(StatusCodes.ERR_CMDSYNTAXERROR)
 
             if self._command == "quit":
                 self._terminated = True

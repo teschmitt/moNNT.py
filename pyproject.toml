@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "monnt.py"
 version = "0.1.0"
-description = ""
+description = "An async RFC 3977 compliant Usenet server"
 authors = ["Thomas Schmitt <t.e.schmitt@posteo.de>"]
 
 [tool.poetry.dependencies]
