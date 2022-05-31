@@ -5,9 +5,10 @@ description = "An async RFC 3977 compliant Usenet server"
 authors = ["Thomas Schmitt <t.e.schmitt@posteo.de>"]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.7.1"
 pydantic = {extras = ["dotenv"], version = "^1.9.0"}
 tortoise-orm = "^0.19.0"
+py-dtn7 = {path = "../py-dtn7", develop = true}
 
 [tool.poetry.dev-dependencies]
 jupyterlab = "^3.3.2"
@@ -26,7 +27,7 @@ src_folder = "./."
 [tool.black]
 include = '\.pyi?$'
 line-length = 100
-target-version = ["py36", "py37", "py38", "py39"]
+target-version = ["py37", "py38", "py39"]
 preview = true
 exclude = '''
 /(

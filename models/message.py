@@ -60,3 +60,7 @@ class Message(Model):
             f"{self.body}\n"
             "---------------------------------------------------------"
         )
+
+    class PydanticMeta:
+        exclude = ("newsgroup",)
+        computed = ()

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Union
 
-from nntp_commands.article import do_article
+from backend.sqlite.nntp_commands.article import do_article
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:

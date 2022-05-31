@@ -1,15 +1,13 @@
 import asyncio
-import datetime
-import uuid
 from asyncio import StreamReader, StreamWriter, Task
-from collections import defaultdict
 from logging import Logger
 from socketserver import ForkingTCPServer
 from typing import List, Optional, Union
 
-from dateutil.parser import parse as date_parse
+from py_dtn7 import DTNClient
 
-import nntp_commands
+from backend.sqlite import nntp_commands
+from backend.sqlite.save import save_article
 from logger import global_logger
 from models import Message, Newsgroup
 from settings import settings
@@ -39,6 +37,7 @@ class AsyncTCPServer:
         self._post_mode: bool = False
         self._article_buffer: list[str] = []
         self._command: Optional[str]
+        self._dtn_client: DTNClient = DTNClient()
         # self.auth_username
 
     def _send(self, send_obj: Union[List[str], str]) -> None:
@@ -109,7 +108,7 @@ class AsyncTCPServer:
                 data_decode = incoming_data.decode(encoding="utf-8").rstrip()
                 if data_decode == ".":
                     try:
-                        await self._save_article()
+                        await save_article(self)
                         self._send(StatusCodes.STATUS_POSTSUCCESSFULL)
                     except Exception as e:  # noqa E722
                         self.logger.error(e)
@@ -195,45 +194,10 @@ class AsyncTCPServer:
     def selected_article(self, val) -> None:
         self._selected_article = val
 
-    async def _save_article(self) -> None:
-        # TODO: support cross posting to multiple newsgroups
-        #       this entails setting up a M2M relationship between message and newsgroup
-        #       https://kb.iu.edu/d/affn
-        header: defaultdict[str] = defaultdict(str)
-        line: str = self._article_buffer.pop(0)
-        field_name: str = ""
-        field_value: str
-        while len(line) != 0:
-            try:
-                if ":" in line:
-                    field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
-                    field_name = field_name.strip().lower()
-                    header[field_name] = field_value.strip()
-                elif len(field_name) > 0:
-                    header[field_name] = f"{header[field_name]} {line}"
-            except ValueError:
-                # something clients send fishy headers … we'll just ignore them.
-                pass
-            line = self._article_buffer.pop(0)
+    @property
+    def article_buffer(self):
+        return self._article_buffer
 
-        group = await Newsgroup.get_or_none(name=header["newsgroups"])
-
-        # we've popped off the complete header, body is just the joined rest
-        body: str = "\n".join(self._article_buffer)
-        dt: datetime = (
-            date_parse(header["date"]) if len(header["date"]) > 0 else datetime.datetime.utcnow()
-        )
-        article = await Message.create(
-            newsgroup=group,
-            from_=header["from"],
-            subject=header["subject"],
-            created_at=dt,
-            message_id=f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
-            body=body,
-            path=f"!{settings.DOMAIN_NAME}",
-            references=header["references"],
-            reply_to=header["reply-to"],
-            organization=header["organization"],
-            user_agent=header["user-agent"],
-        )
-        self.logger.info(f"added article {article} to DB")
+    @property
+    def dtn_client(self):
+        return self._dtn_client

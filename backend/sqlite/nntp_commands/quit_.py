@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from nntp_commands import logger
+from backend.sqlite.nntp_commands import logger
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
