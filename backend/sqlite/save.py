@@ -39,6 +39,10 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     # we've popped off the complete header, body is just the joined rest
     body: str = "\n".join(server_state.article_buffer)
     dt: datetime = date_parse(header["date"]) if len(header["date"]) > 0 else datetime.utcnow()
+
+    # some cleaning up:
+    header["references"].replace("\t", "")
+
     try:
         await Message.create(
             newsgroup=group,
@@ -73,9 +77,8 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     }
 
     try:
-        server_state.dtn_client.send(
-            payload=dtn_payload, destination=f"dtn://{group_name}", endpoint="~news"
-        )
+        # TODO: get lifetime, destination settings from settings:
+        server_state.dtn_client.send(payload=dtn_payload, destination=f"dtn://{group_name}/~news")
     except Exception as e:  # noqa E722
         # TODO: do some error handling here
         pass
