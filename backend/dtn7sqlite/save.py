@@ -1,4 +1,5 @@
 import asyncio
+from hashlib import sha256
 import re
 from collections import defaultdict
 from datetime import datetime
@@ -6,7 +7,7 @@ from typing import TYPE_CHECKING, Union
 
 import cbor2
 from cbor2 import CBORDecodeEOF
-from py_dtn7 import from_dtn_timestamp
+from py_dtn7 import from_dtn_timestamp, DTNRESTClient
 
 from models import Message, Newsgroup, DTNMessage
 from settings import settings
@@ -74,9 +75,13 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
         "delivery_notification": settings.DTN_DELIV_NOTIFICATION,
         "lifetime": settings.DTN_BUNDLE_LIFETIME,
     }
+    rest: DTNRESTClient = DTNRESTClient()
+    rest.register(endpoint=dtn_args["source"])
 
-    await DTNMessage.create(**dtn_args, data=dtn_payload)
+    article_hash = get_article_hash(**dtn_args, data=dtn_payload)
+    await DTNMessage.create(**dtn_args, data=dtn_payload, hash=article_hash)
 
+    print(f"Sending {dtn_args} with data {dtn_payload}")
     server_state.dtn_ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
 
     try:
@@ -99,6 +104,7 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
     :param ws_data: data sent from the DTNd over the Websockets connection
     :return: None
     """
+    print(ws_data)
     if isinstance(ws_data, str):
         # probably a status code, so check if it's an error that should be logged
         if ws_data.startswith("4") or ws_data.startswith("5"):
@@ -114,19 +120,27 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
             )
         try:
             # map BP7 to NNTP fields
-            sender_data: list[str] = ws_dict["src"].replace("dtn://", "").replace("//", "").split("/")
+            print(ws_dict)
+            sender_data: list[str] = (
+                ws_dict["src"].replace("dtn://", "").replace("//", "").split("/")
+            )
             sender: str = f"{sender_data[-1]}@{sender_data[0]}"
             group: str = ws_dict["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
-            node_id, ts_str, seq_str = (
-                ws_dict["bid"].replace("dtn://", "").replace("/", "").split("-")
+            bid_data: list[str] = (
+                ws_dict["bid"].split("-")
             )
+            src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
+            seq_str: str = bid_data[-1]
+            ts_str: str = bid_data[-2]
             dt: datetime = from_dtn_timestamp(int(ts_str))
-            msg_id: str = f"<{ts_str}-{seq_str}@{node_id}.dtn>"
+            msg_id: str = f"<{ts_str}-{seq_str}@{src_like}.dtn>"
 
             msg_data: dict = cbor2.loads(ws_dict["data"])
 
             asyncio.new_event_loop().run_until_complete(
-                create_message(dt=dt, sender=sender, group_name=group, msg_data=msg_data, msg_id=msg_id)
+                create_message(
+                    dt=dt, sender=sender, group_name=group, msg_data=msg_data, msg_id=msg_id
+                )
             )
         except Exception as e:  # noqa E722
             # TODO: do some error handling here
@@ -151,3 +165,13 @@ async def create_message(dt, sender, group_name, msg_data, msg_id):
         # organization=header["organization"],
         # user_agent=header["user-agent"],
     )
+
+
+def get_article_hash(
+        source: str, destination: str, delivery_notification: bool, data: dict, lifetime: int
+) -> str:
+    hash_bytes = (
+        f"{source}+{destination}+{str(delivery_notification)}+{data['subject']}+{data['body']}+"
+        f"{data['references']}+{str(lifetime)}".encode(encoding="utf-8")
+    )
+    return sha256(hash_bytes).hexdigest()

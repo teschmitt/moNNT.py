@@ -3,7 +3,7 @@ from logger import global_logger
 logger = global_logger()
 
 
-from backend.sqlite.nntp_commands import (  # noqa: E402
+from backend.dtn7sqlite.nntp_commands import (  # noqa: E402
     article,
     capabilities,
     date,

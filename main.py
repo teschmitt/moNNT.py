@@ -4,8 +4,8 @@ from threading import Thread
 from py_dtn7 import DTNRESTClient, DTNWSClient
 from tortoise import Tortoise, run_async
 
-from backend.sqlite import get_all_newsgroups
-from backend.sqlite.save import ws_handler
+from backend.dtn7sqlite import get_all_newsgroups
+from backend.dtn7sqlite.save import ws_handler
 from logger import global_logger
 from nntp_server import AsyncTCPServer
 from settings import settings

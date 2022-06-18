@@ -6,8 +6,8 @@ from typing import List, Optional, Union
 
 from py_dtn7 import DTNRESTClient, DTNWSClient
 
-from backend.sqlite import nntp_commands
-from backend.sqlite.save import save_article
+from backend.dtn7sqlite import nntp_commands
+from backend.dtn7sqlite.save import save_article
 from logger import global_logger
 from models import Message, Newsgroup
 from settings import settings
