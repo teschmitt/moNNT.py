@@ -71,8 +71,8 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     dtn_args: dict = {
         "source": f"dtn://{domain_email}/mail/{name_email}",
         "destination": f"dtn://{group_name}/~news",
-        "delivery_notification": False,
-        "lifetime": 24 * 3600 * 1000,
+        "delivery_notification": settings.DTN_DELIV_NOTIFICATION,
+        "lifetime": settings.LIFETIME,
     }
 
     await DTNMessage.create(**dtn_args, data=dtn_payload)
