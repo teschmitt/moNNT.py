@@ -9,6 +9,7 @@ import cbor2
 from cbor2 import CBORDecodeEOF
 from py_dtn7 import from_dtn_timestamp, DTNRESTClient
 
+from logger import global_logger
 from models import Message, Newsgroup, DTNMessage
 from settings import settings
 
@@ -20,6 +21,8 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     # TODO: support cross posting to multiple newsgroups
     #       this entails setting up a M2M relationship between message and newsgroup
     #       https://kb.iu.edu/d/affn
+    logger = global_logger()
+    logger.debug("Sending article to DTNd and local DTN message spool")
     header: defaultdict[str] = defaultdict(str)
     line: str = server_state.article_buffer.pop(0)
     field_name: str = ""
@@ -75,23 +78,23 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
         "delivery_notification": settings.DTN_DELIV_NOTIFICATION,
         "lifetime": settings.DTN_BUNDLE_LIFETIME,
     }
+
+    # register the source endpoint so dtnd knows we want to keep the message in memory
+    logger.debug(f"Registering message source as endpoint: {dtn_args['source']}")
     rest: DTNRESTClient = DTNRESTClient()
     rest.register(endpoint=dtn_args["source"])
 
-    article_hash = get_article_hash(**dtn_args, data=dtn_payload)
-    await DTNMessage.create(**dtn_args, data=dtn_payload, hash=article_hash)
+    message_hash = get_article_hash(
+        source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
+    )
+    logger.debug(f"Got message hash: {message_hash}")
 
-    print(f"Sending {dtn_args} with data {dtn_payload}")
+    dtn_msg: DTNMessage = await DTNMessage.create(**dtn_args, data=dtn_payload, hash=message_hash)
+    logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
+
+    # TODO: Handle conection failure and write to error logs in spool
     server_state.dtn_ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
-
-    try:
-        pass
-
-    except Exception as e:  # noqa E722
-        # TODO: do some error handling here
-        pass
-
-    # self.logger.info(f"added article {article} to DB")
+    logger.debug(f"Sending article to DTNd with {dtn_args}")
 
 
 def ws_handler(ws_data: Union[str | bytes]) -> None:
@@ -104,13 +107,16 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
     :param ws_data: data sent from the DTNd over the Websockets connection
     :return: None
     """
-    print(ws_data)
+    logger = global_logger()
+    logger.debug("Received WebSocket data from DTNd")
+
     if isinstance(ws_data, str):
         # probably a status code, so check if it's an error that should be logged
         if ws_data.startswith("4") or ws_data.startswith("5"):
             # TODO: log error
             pass
     elif isinstance(ws_data, bytes):
+        logger.debug("Data determined to by bytes.")
         try:
             ws_dict: dict = cbor2.loads(ws_data)
         except (CBORDecodeEOF, MemoryError) as e:
@@ -119,29 +125,8 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
                 f"will fail on account of this error: {e}"
             )
         try:
-            # map BP7 to NNTP fields
-            print(ws_dict)
-            sender_data: list[str] = (
-                ws_dict["src"].replace("dtn://", "").replace("//", "").split("/")
-            )
-            sender: str = f"{sender_data[-1]}@{sender_data[0]}"
-            group: str = ws_dict["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
-            bid_data: list[str] = (
-                ws_dict["bid"].split("-")
-            )
-            src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
-            seq_str: str = bid_data[-1]
-            ts_str: str = bid_data[-2]
-            dt: datetime = from_dtn_timestamp(int(ts_str))
-            msg_id: str = f"<{ts_str}-{seq_str}@{src_like}.dtn>"
-
-            msg_data: dict = cbor2.loads(ws_dict["data"])
-
-            asyncio.new_event_loop().run_until_complete(
-                create_message(
-                    dt=dt, sender=sender, group_name=group, msg_data=msg_data, msg_id=msg_id
-                )
-            )
+            logger.debug("Starting data handler.")
+            asyncio.new_event_loop().run_until_complete(handle_sent_article(ws_struct=ws_dict))
         except Exception as e:  # noqa E722
             # TODO: do some error handling here
             raise Exception(e)
@@ -150,9 +135,30 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
         raise ValueError("Handler received unrecognizable data.")
 
 
-async def create_message(dt, sender, group_name, msg_data, msg_id):
+async def handle_sent_article(ws_struct: dict):
+    logger = global_logger()
+    logger.debug("Mapping BP7 to NNTP fields")
+
+    # map BP7 to NNTP fields
+    sender_data: list[str] = ws_struct["src"].replace("dtn://", "").replace("//", "").split("/")
+    sender: str = f"{sender_data[-1]}@{sender_data[0]}"
+
+    group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
+
+    bid_data: list[str] = ws_struct["bid"].split("-")
+    src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
+    seq_str: str = bid_data[-1]
+    ts_str: str = bid_data[-2]
+
+    dt: datetime = from_dtn_timestamp(int(ts_str))
+    msg_id: str = f"<{ts_str}-{seq_str}@{src_like}.dtn>"
+
+    msg_data: dict = cbor2.loads(ws_struct["data"])
+
+    logger.debug("Creating article entry in newsgroup DB")
     group = await Newsgroup.get_or_none(name=group_name)
-    await Message.create(
+    # TODO: Error handling in case group does not exist
+    msg: Message = await Message.create(
         newsgroup=group,
         from_=sender,
         subject=msg_data["subject"],
@@ -165,13 +171,24 @@ async def create_message(dt, sender, group_name, msg_data, msg_id):
         # organization=header["organization"],
         # user_agent=header["user-agent"],
     )
+    logger.debug(f"Created new entry with id {msg.id} in articles table")
 
-
-def get_article_hash(
-        source: str, destination: str, delivery_notification: bool, data: dict, lifetime: int
-) -> str:
-    hash_bytes = (
-        f"{source}+{destination}+{str(delivery_notification)}+{data['subject']}+{data['body']}+"
-        f"{data['references']}+{str(lifetime)}".encode(encoding="utf-8")
+    # remove message from spool
+    logger.debug("Removing corresponding entry from dtnd message spool")
+    article_hash = get_article_hash(
+        source=ws_struct["src"],
+        destination=ws_struct["dst"],
+        data=msg_data,
     )
-    return sha256(hash_bytes).hexdigest()
+    del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
+    if del_cnt == 1:
+        logger.debug(f"Successful, removed entry")
+    else:
+        logger.error(f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead of 1")
+
+
+def get_article_hash(source: str, destination: str, data: dict) -> str:
+    return sha256(
+        f"{source}+{destination}+{data['subject']}+{data['body']}+{data['references']}+"
+        f"{data['reply_to']}".encode(encoding="utf-8")
+    ).hexdigest()
