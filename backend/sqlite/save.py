@@ -72,7 +72,7 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
         "source": f"dtn://{domain_email}/mail/{name_email}",
         "destination": f"dtn://{group_name}/~news",
         "delivery_notification": settings.DTN_DELIV_NOTIFICATION,
-        "lifetime": settings.LIFETIME,
+        "lifetime": settings.DTN_BUNDLE_LIFETIME,
     }
 
     await DTNMessage.create(**dtn_args, data=dtn_payload)
@@ -83,7 +83,6 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
         pass
 
     except Exception as e:  # noqa E722
-        print("AAAAAARGH")
         # TODO: do some error handling here
         pass
 
@@ -100,8 +99,6 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
     :param ws_data: data sent from the DTNd over the Websockets connection
     :return: None
     """
-    print(f"Hello from {__name__}")
-    print(f"Data: {ws_data}")
     if isinstance(ws_data, str):
         # probably a status code, so check if it's an error that should be logged
         if ws_data.startswith("4") or ws_data.startswith("5"):
@@ -110,7 +107,6 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
     elif isinstance(ws_data, bytes):
         try:
             ws_dict: dict = cbor2.loads(ws_data)
-            print(ws_dict)
         except (CBORDecodeEOF, MemoryError) as e:
             raise RuntimeError(
                 "Something went wrong decoding a CBOR data object. Any intended save operation "
@@ -118,6 +114,8 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
             )
         try:
             # map BP7 to NNTP fields
+            sender_data: list[str] = ws_dict["src"].replace("dtn://", "").replace("//", "").split("/")
+            sender: str = f"{sender_data[-1]}@{sender_data[0]}"
             group: str = ws_dict["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
             node_id, ts_str, seq_str = (
                 ws_dict["bid"].replace("dtn://", "").replace("/", "").split("-")
@@ -128,7 +126,7 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
             msg_data: dict = cbor2.loads(ws_dict["data"])
 
             asyncio.new_event_loop().run_until_complete(
-                create_message(dt=dt, group_name=group, msg_data=msg_data, msg_id=msg_id)
+                create_message(dt=dt, sender=sender, group_name=group, msg_data=msg_data, msg_id=msg_id)
             )
         except Exception as e:  # noqa E722
             # TODO: do some error handling here
@@ -138,11 +136,11 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
         raise ValueError("Handler received unrecognizable data.")
 
 
-async def create_message(dt, group_name, msg_data, msg_id):
+async def create_message(dt, sender, group_name, msg_data, msg_id):
     group = await Newsgroup.get_or_none(name=group_name)
     await Message.create(
         newsgroup=group,
-        from_=msg_data["from"],
+        from_=sender,
         subject=msg_data["subject"],
         created_at=dt,
         message_id=msg_id,
