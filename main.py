@@ -38,6 +38,10 @@ if __name__ == "__main__":
         ws_client.subscribe(endpoint=eid)
 
     loop.run_until_complete(nntp_server.start_serving())
-    loop.run_forever()
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        print("Received Ctrl-C, stopping server")
     ws_client.stop_client()
     ws_task.join()
+    print("Stopped WebSocket client. Exiting.")

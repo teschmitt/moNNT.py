@@ -1,4 +1,5 @@
 import asyncio
+import re
 from collections import defaultdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Union
@@ -7,7 +8,7 @@ import cbor2
 from cbor2 import CBORDecodeEOF
 from py_dtn7 import from_dtn_timestamp
 
-from models import Message, Newsgroup
+from models import Message, Newsgroup, DTNMessage
 from settings import settings
 
 if TYPE_CHECKING:
@@ -48,7 +49,7 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     group_name: str = group.name
     dtn_payload: dict = {
         # "newsgroup": group_name,
-        "from": header["from"],
+        # "from": header["from"],
         "subject": header["subject"],
         # "created_at": dt.isoformat(),
         # "message_id": f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
@@ -61,17 +62,28 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     }
 
     try:
-        # TODO: get lifetime, destination settings from settings:
-        # server_state.dtn_rest_client.send(
-        #     payload=dtn_payload, destination=f"dtn://{group_name}/~news"
-        # )
-        server_state.dtn_ws_client.send_data(
-            destination=f"dtn://{group_name}/~news",
-            data=cbor2.dumps(dtn_payload),
-            delivery_notification=False,
-            lifetime=24 * 3600 * 1000,
-        )
+        sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
+    except AttributeError as e:
+        # TODO log a serious error: email could not be recognized
+        sender_email: str = "not-recognized@email-address.net"
+    name_email, domain_email = sender_email.split("@")
+    # TODO: get lifetime, destination settings from settings:
+    dtn_args: dict = {
+        "source": f"dtn://{domain_email}/mail/{name_email}",
+        "destination": f"dtn://{group_name}/~news",
+        "delivery_notification": False,
+        "lifetime": 24 * 3600 * 1000,
+    }
+
+    await DTNMessage.create(**dtn_args, data=dtn_payload)
+
+    server_state.dtn_ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
+
+    try:
+        pass
+
     except Exception as e:  # noqa E722
+        print("AAAAAARGH")
         # TODO: do some error handling here
         pass
 
