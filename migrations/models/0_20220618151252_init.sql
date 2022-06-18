@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS "dtnmessage" (
     "delivery_notification" INT NOT NULL  DEFAULT 0,
     "lifetime" INT NOT NULL  DEFAULT 86400000,
     "retries" INT NOT NULL  DEFAULT 0,
+    "hash" VARCHAR(64) NOT NULL,
     "error_log" TEXT,
     "created_at" TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );

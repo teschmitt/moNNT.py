@@ -15,4 +15,5 @@ class DTNMessage(Model):
     # housekeeping fields
     retries = fields.IntField(default=0, null=False)
     error_log = fields.TextField(null=True)
+    hash = fields.CharField(max_length=64, null=False)
     created_at = fields.DatetimeField(auto_now_add=True, null=False)
