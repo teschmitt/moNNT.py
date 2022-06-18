@@ -5,6 +5,8 @@ from enum import Enum
 from fnmatch import fnmatch
 from pathlib import Path
 
+import toml
+
 from models import Message
 from settings import settings
 
@@ -51,19 +53,10 @@ class ParsedRange:
                 self.parse_status = RangeParseStatus.FAILURE
 
 
-def get_version():
-    # it is astonishingly hard to pry the version number out of pyproject.toml
-    version = "[unidentified -- either pyproject.toml is missing or configured incorrectly]"
-    compiled_version_regex = re.compile(r"\s*version\s*=\s*[\"']\s*([-.\w]{3,})\s*[\"']\s*")
-    pyproject = Path(os.path.dirname(os.path.abspath(__file__))) / "pyproject.toml"
-    if pyproject.is_file():
-        with pyproject.open(mode="r") as fh:
-            for line in fh:
-                ver = compiled_version_regex.search(line)
-                if ver is not None:
-                    version = ver.group(1).strip()
-                    break
-    return version
+def get_version() -> str:
+    pyproject_path = Path(os.path.dirname(os.path.abspath(__file__))) / "pyproject.toml"
+    pyproject = toml.loads(open(str(pyproject_path)).read())
+    return pyproject["tool"]["poetry"]["version"]
 
 
 def build_xref(article_id: int, group_name: str) -> str:
