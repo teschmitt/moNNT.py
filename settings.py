@@ -41,6 +41,9 @@ class GlobalSettings(BaseSettings):
     # server behavior
     MAX_EMPTY_REQUESTS: Optional[int] = 10
 
+    DTN_BUNDLE_LIFETIME: Optional[int] = None
+    DTN_DELIV_NOTIFICATION: Optional[bool] = None
+
     class Config:
         """Loads the dotenv file."""
 

@@ -1,4 +1,16 @@
 -- upgrade --
+CREATE TABLE IF NOT EXISTS "dtnmessage" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "source" VARCHAR(255) NOT NULL,
+    "destination" VARCHAR(255) NOT NULL,
+    "data" JSON NOT NULL,
+    "delivery_notification" INT NOT NULL  DEFAULT 0,
+    "lifetime" INT NOT NULL  DEFAULT 86400000,
+    "retries" INT NOT NULL  DEFAULT 0,
+    "hash" VARCHAR(64) NOT NULL,
+    "error_log" TEXT,
+    "created_at" TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS "newsgroup" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "name" VARCHAR(255) NOT NULL,
@@ -26,6 +38,6 @@ CREATE TABLE IF NOT EXISTS "message" (
 CREATE TABLE IF NOT EXISTS "aerich" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "version" VARCHAR(255) NOT NULL,
-    "app" VARCHAR(20) NOT NULL,
+    "app" VARCHAR(100) NOT NULL,
     "content" JSON NOT NULL
 );

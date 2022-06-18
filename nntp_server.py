@@ -4,10 +4,10 @@ from logging import Logger
 from socketserver import ForkingTCPServer
 from typing import List, Optional, Union
 
-from py_dtn7 import DTNClient
+from py_dtn7 import DTNRESTClient, DTNWSClient
 
-from backend.sqlite import nntp_commands
-from backend.sqlite.save import save_article
+from backend.dtn7sqlite import nntp_commands
+from backend.dtn7sqlite.save import save_article
 from logger import global_logger
 from models import Message, Newsgroup
 from settings import settings
@@ -22,7 +22,7 @@ class NNTPServer(ForkingTCPServer):
 
 
 class AsyncTCPServer:
-    def __init__(self, hostname: str, port: int) -> None:
+    def __init__(self, hostname: str, port: int, backend: DTNWSClient) -> None:
         self.hostname: str = hostname
         self.port: int = port
         self.reader: StreamReader
@@ -37,7 +37,8 @@ class AsyncTCPServer:
         self._post_mode: bool = False
         self._article_buffer: list[str] = []
         self._command: Optional[str]
-        self._dtn_client: DTNClient = DTNClient()
+        self._dtn_rest_client: DTNRESTClient = DTNRESTClient()
+        self._dtn_ws_client: DTNWSClient = backend
         # self.auth_username
 
     def _send(self, send_obj: Union[List[str], str]) -> None:
@@ -109,7 +110,7 @@ class AsyncTCPServer:
                 if data_decode == ".":
                     try:
                         await save_article(self)
-                        self._send(StatusCodes.STATUS_POSTSUCCESSFULL)
+                        self._send(StatusCodes.STATUS_POSTSUCCESSFUL)
                     except Exception as e:  # noqa E722
                         self.logger.error(e)
                         self._send(StatusCodes.ERR_NOTPERFORMED)
@@ -199,5 +200,9 @@ class AsyncTCPServer:
         return self._article_buffer
 
     @property
-    def dtn_client(self):
-        return self._dtn_client
+    def dtn_rest_client(self):
+        return self._dtn_rest_client
+
+    @property
+    def dtn_ws_client(self):
+        return self._dtn_ws_client
