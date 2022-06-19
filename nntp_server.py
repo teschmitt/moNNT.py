@@ -37,7 +37,6 @@ class AsyncTCPServer:
         self._post_mode: bool = False
         self._article_buffer: list[str] = []
         self._command: Optional[str]
-        self._dtn_rest_client: DTNRESTClient = DTNRESTClient()
         self._backend: Optional[DTNWSClient] = backend
         # self.auth_username
 
@@ -159,6 +158,9 @@ class AsyncTCPServer:
             client_connected_cb=self._accept_client, host=self.hostname, port=self.port
         )
 
+    def stop_serving(self) -> None:
+        self._terminated = True
+
     @property
     def article_buffer(self):
         return self._article_buffer
@@ -178,14 +180,6 @@ class AsyncTCPServer:
     @property
     def command(self) -> Optional[str]:
         return self._command
-
-    @property
-    def dtn_rest_client(self):
-        return self._dtn_rest_client
-
-    @property
-    def dtn_ws_client(self):
-        return self._backend
 
     @property
     def post_mode(self) -> bool:

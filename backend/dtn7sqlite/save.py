@@ -68,7 +68,7 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     try:
         sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
     except AttributeError as e:
-        # TODO log a serious error: email could not be recognized
+        logger.warning(f"Email address could ot be parsed: {e}")
         sender_email: str = "not-recognized@email-address.net"
     name_email, domain_email = sender_email.split("@")
     # TODO: get lifetime, destination settings from settings:
@@ -79,11 +79,6 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
         "lifetime": settings.DTN_BUNDLE_LIFETIME,
     }
 
-    # register the source endpoint so dtnd knows we want to keep the message in memory
-    logger.debug(f"Registering message source as endpoint: {dtn_args['source']}")
-    rest: DTNRESTClient = DTNRESTClient()
-    rest.register(endpoint=dtn_args["source"])
-
     message_hash = get_article_hash(
         source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
     )
@@ -92,8 +87,17 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     dtn_msg: DTNMessage = await DTNMessage.create(**dtn_args, data=dtn_payload, hash=message_hash)
     logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
 
+    await send_to_dtnd(dtn_args, dtn_payload, server_state)
+
+
+async def send_to_dtnd(dtn_args: dict, dtn_payload: dict, server_state: "AsyncTCPServer"):
+    # register the source endpoint so dtnd knows we want to keep the message in memory
+    logger = global_logger()
+    logger.debug(f"Registering message source as endpoint: {dtn_args['source']}")
+    rest: DTNRESTClient = DTNRESTClient()
+    rest.register(endpoint=dtn_args["source"])
     # TODO: Handle connection failure and write to error logs in spool
-    server_state.dtn_ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
+    server_state.backend.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
     logger.debug(f"Sending article to DTNd with {dtn_args}")
 
 
@@ -128,6 +132,7 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
             )
             logger.exception(err)
             raise err
+
         try:
             logger.debug("Starting data handler.")
             asyncio.new_event_loop().run_until_complete(handle_sent_article(ws_struct=ws_dict))
@@ -178,15 +183,15 @@ async def handle_sent_article(ws_struct: dict):
     logger.debug(f"Created new entry with id {msg.id} in articles table")
 
     # remove message from spool
-    logger.debug("Removing corresponding entry from dtnd message spool")
     article_hash = get_article_hash(
         source=ws_struct["src"],
         destination=ws_struct["dst"],
         data=msg_data,
     )
+    logger.debug(f"Removing corresponding entry from dtnd message spool: {article_hash}")
     del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
     if del_cnt == 1:
-        logger.debug(f"Successful, removed spool entry")
+        logger.debug("Successful, removed spool entry")
     else:
         logger.error(
             f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead of 1"
