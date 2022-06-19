@@ -92,7 +92,7 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     dtn_msg: DTNMessage = await DTNMessage.create(**dtn_args, data=dtn_payload, hash=message_hash)
     logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
 
-    # TODO: Handle conection failure and write to error logs in spool
+    # TODO: Handle connection failure and write to error logs in spool
     server_state.dtn_ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
     logger.debug(f"Sending article to DTNd with {dtn_args}")
 
@@ -108,22 +108,26 @@ def ws_handler(ws_data: Union[str | bytes]) -> None:
     :return: None
     """
     logger = global_logger()
-    logger.debug("Received WebSocket data from DTNd")
 
     if isinstance(ws_data, str):
+        logger.debug(f"Received WebSocket data from DTNd, probably a status message: {ws_data}")
         # probably a status code, so check if it's an error that should be logged
-        if ws_data.startswith("4") or ws_data.startswith("5"):
-            # TODO: log error
-            pass
+        if ws_data.startswith("4"):
+            logger.info(f"User caused an error: {ws_data}")
+        if ws_data.startswith("5"):
+            logger.error(f"Server-side error: {ws_data}")
+
     elif isinstance(ws_data, bytes):
-        logger.debug("Data determined to by bytes.")
+        logger.debug("Received WebSocket data from DTNd. Data determined to by bytes.")
         try:
             ws_dict: dict = cbor2.loads(ws_data)
         except (CBORDecodeEOF, MemoryError) as e:
-            raise RuntimeError(
+            err: RuntimeError = RuntimeError(
                 "Something went wrong decoding a CBOR data object. Any intended save operation "
                 f"will fail on account of this error: {e}"
             )
+            logger.exception(err)
+            raise err
         try:
             logger.debug("Starting data handler.")
             asyncio.new_event_loop().run_until_complete(handle_sent_article(ws_struct=ws_dict))
@@ -182,9 +186,11 @@ async def handle_sent_article(ws_struct: dict):
     )
     del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
     if del_cnt == 1:
-        logger.debug(f"Successful, removed entry")
+        logger.debug(f"Successful, removed spool entry")
     else:
-        logger.error(f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead of 1")
+        logger.error(
+            f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead of 1"
+        )
 
 
 def get_article_hash(source: str, destination: str, data: dict) -> str:

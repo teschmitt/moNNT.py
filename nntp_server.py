@@ -22,7 +22,7 @@ class NNTPServer(ForkingTCPServer):
 
 
 class AsyncTCPServer:
-    def __init__(self, hostname: str, port: int, backend: DTNWSClient) -> None:
+    def __init__(self, hostname: str, port: int, backend: Optional[DTNWSClient]) -> None:
         self.hostname: str = hostname
         self.port: int = port
         self.reader: StreamReader
@@ -38,7 +38,7 @@ class AsyncTCPServer:
         self._article_buffer: list[str] = []
         self._command: Optional[str]
         self._dtn_rest_client: DTNRESTClient = DTNRESTClient()
-        self._dtn_ws_client: DTNWSClient = backend
+        self._backend: Optional[DTNWSClient] = backend
         # self.auth_username
 
     def _send(self, send_obj: Union[List[str], str]) -> None:
@@ -160,6 +160,18 @@ class AsyncTCPServer:
         )
 
     @property
+    def article_buffer(self):
+        return self._article_buffer
+
+    @property
+    def backend(self):
+        return self._backend
+
+    @backend.setter
+    def backend(self, new_backend: DTNWSClient):
+        self._backend = new_backend
+
+    @property
     def cmd_args(self) -> Optional[list[str]]:
         return self._cmd_args
 
@@ -168,8 +180,12 @@ class AsyncTCPServer:
         return self._command
 
     @property
-    def terminated(self) -> bool:
-        return self._terminated
+    def dtn_rest_client(self):
+        return self._dtn_rest_client
+
+    @property
+    def dtn_ws_client(self):
+        return self._backend
 
     @property
     def post_mode(self) -> bool:
@@ -180,14 +196,6 @@ class AsyncTCPServer:
         self._post_mode = val
 
     @property
-    def selected_group(self) -> Optional[Newsgroup]:
-        return self._selected_group
-
-    @selected_group.setter
-    def selected_group(self, val) -> None:
-        self._selected_group = val
-
-    @property
     def selected_article(self) -> Optional[Message]:
         return self._selected_article
 
@@ -196,13 +204,13 @@ class AsyncTCPServer:
         self._selected_article = val
 
     @property
-    def article_buffer(self):
-        return self._article_buffer
+    def selected_group(self) -> Optional[Newsgroup]:
+        return self._selected_group
+
+    @selected_group.setter
+    def selected_group(self, val) -> None:
+        self._selected_group = val
 
     @property
-    def dtn_rest_client(self):
-        return self._dtn_rest_client
-
-    @property
-    def dtn_ws_client(self):
-        return self._dtn_ws_client
+    def terminated(self) -> bool:
+        return self._terminated
