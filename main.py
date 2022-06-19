@@ -37,6 +37,7 @@ async def send_all(msgs: list[dict], server: AsyncTCPServer):
                     "lifetime": msg["lifetime"],
                 },
                 dtn_payload=msg["data"],
+                hash=msg["hash"],
                 server_state=server,
             )
             for msg in msgs

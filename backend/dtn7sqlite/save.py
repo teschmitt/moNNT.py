@@ -87,18 +87,28 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     dtn_msg: DTNMessage = await DTNMessage.create(**dtn_args, data=dtn_payload, hash=message_hash)
     logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
 
-    await send_to_dtnd(dtn_args, dtn_payload, server_state)
+    await send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash=message_hash, server_state=server_state)
 
 
-async def send_to_dtnd(dtn_args: dict, dtn_payload: dict, server_state: "AsyncTCPServer"):
+async def send_to_dtnd(dtn_args: dict, dtn_payload: dict, hash: str, server_state: "AsyncTCPServer"):
     # register the source endpoint so dtnd knows we want to keep the message in memory
     logger = global_logger()
     logger.debug(f"Registering message source as endpoint: {dtn_args['source']}")
-    rest: DTNRESTClient = DTNRESTClient()
-    rest.register(endpoint=dtn_args["source"])
-    # TODO: Handle connection failure and write to error logs in spool
-    server_state.backend.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
-    logger.debug(f"Sending article to DTNd with {dtn_args}")
+    try:
+        rest: DTNRESTClient = DTNRESTClient()
+        rest.register(endpoint=dtn_args["source"])
+        logger.debug(f"Sending article to DTNd with {dtn_args}")
+        server_state.backend.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
+    except Exception as e:
+        # log failure in spool entry
+        try:
+            msg: DTNMessage = await DTNMessage.get_or_none(hash=hash)
+            if msg.error_log is None:
+                msg.error_log = ""
+            msg.error_log += f"\n{datetime.utcnow().isoformat()} ERROR Failure delivering to DTNd: {e}"
+            await msg.save()
+        except Exception as e:  # noqa E722
+            logger.warning(f"Could not update the error log of spool entry for message {hash}: {e}")
 
 
 def ws_handler(ws_data: Union[str | bytes]) -> None:

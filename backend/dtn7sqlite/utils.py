@@ -7,5 +7,5 @@ async def get_all_newsgroups() -> list[str]:
 
 async def get_all_spooled_messages() -> list[dict]:
     return await DTNMessage.all().values(
-        "source", "destination", "data", "delivery_notification", "lifetime"
+        "source", "destination", "data", "hash", "delivery_notification", "lifetime"
     )
