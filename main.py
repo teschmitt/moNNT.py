@@ -4,12 +4,13 @@ from threading import Thread
 from typing import Coroutine
 
 import cbor2
-from py_dtn7 import DTNRESTClient, DTNWSClient
+from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
 from tortoise import Tortoise, run_async
 
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
 from backend.dtn7sqlite.save import ws_handler, send_to_dtnd
 from logger import global_logger
+from models import Newsgroup, Message
 from nntp_server import AsyncTCPServer
 from settings import settings
 from utils import get_version
@@ -45,6 +46,50 @@ async def send_all(msgs: list[dict], server: AsyncTCPServer):
     )
 
 
+async def ingest_all_from_dtnd() -> None:
+    logger.debug("Ingesting all newsgroup bundles in DTNd bundle store.")
+    rest: DTNRESTClient = DTNRESTClient()
+    all_groups: list[str] = await get_all_newsgroups()
+    logger.debug(f"Found {len(all_groups)} active newsgroups on this server.")
+    all_bundles: filter[Bundle] = filter(
+        lambda b: b.destination.replace("dtn://", "").replace("//", "").replace("/~news", "")
+        in all_groups,
+        rest.get_all_bundles()
+    )
+
+    for bundle in all_bundles:
+        msg_id: str = (f"<{bundle.timestamp}-{bundle.sequence_number}@"
+                       f"{bundle.source.replace('dtn://', '').replace('/', '-')}.dtn>")
+
+        mail_domain, mail_name = (
+            bundle.source.replace("dtn://", "").replace("//", "").split("/mail/", maxsplit=1)
+        )
+        from_: str = f"{mail_name}@{mail_domain}"
+
+        group_name: str = (
+            bundle.destination.replace("dtn://", "").replace("//", "").replace("/~news", "")
+        )
+        group: Newsgroup = await Newsgroup.get_or_none(name=group_name)
+
+        data: dict = cbor2.loads(bundle.payload_block.data)
+
+        _, created = await Message.get_or_create(
+            newsgroup=group,
+            from_=from_,
+            subject=data["subject"],
+            created_at=from_dtn_timestamp(int(bundle.timestamp)),
+            message_id=msg_id,
+            body=data["body"],
+            # path=f"!{settings.DOMAIN_NAME}",
+            references=data["references"],
+            reply_to=data["reply-to"],
+        )
+        if created:
+            logger.debug(f"Created new newsgroup article {msg_id} in newsgroup '{group.name}'.")
+        else:
+            logger.debug(f"Article {msg_id} already present in newsgroup '{group.name}'.")
+
+
 def deliver_spool(server: AsyncTCPServer):
     logger.debug("Getting spooled msgs")
     msgs: list[dict] = asyncio.new_event_loop().run_until_complete(get_all_spooled_messages())
@@ -62,6 +107,7 @@ def deliver_spool(server: AsyncTCPServer):
         retries += 1
 
     asyncio.run(send_all(msgs=msgs, server=server))
+    asyncio.run(ingest_all_from_dtnd())
 
 
 def reconnect_handler(server: AsyncTCPServer):
@@ -133,6 +179,8 @@ if __name__ == "__main__":
     reconn_task: Thread = Thread(target=reconnect_handler, kwargs={"server": nntp_server})
     reconn_task.daemon = True
     reconn_task.start()
+
+    asyncio.run(ingest_all_from_dtnd())
 
     """
     --------------------------------------------------------------------------------------------------------------------

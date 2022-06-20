@@ -87,10 +87,14 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     dtn_msg: DTNMessage = await DTNMessage.create(**dtn_args, data=dtn_payload, hash=message_hash)
     logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
 
-    await send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash=message_hash, server_state=server_state)
+    await send_to_dtnd(
+        dtn_args=dtn_args, dtn_payload=dtn_payload, hash=message_hash, server_state=server_state
+    )
 
 
-async def send_to_dtnd(dtn_args: dict, dtn_payload: dict, hash: str, server_state: "AsyncTCPServer"):
+async def send_to_dtnd(
+    dtn_args: dict, dtn_payload: dict, hash: str, server_state: "AsyncTCPServer"
+):
     # register the source endpoint so dtnd knows we want to keep the message in memory
     logger = global_logger()
     logger.debug(f"Registering message source as endpoint: {dtn_args['source']}")
@@ -105,7 +109,9 @@ async def send_to_dtnd(dtn_args: dict, dtn_payload: dict, hash: str, server_stat
             msg: DTNMessage = await DTNMessage.get_or_none(hash=hash)
             if msg.error_log is None:
                 msg.error_log = ""
-            msg.error_log += f"\n{datetime.utcnow().isoformat()} ERROR Failure delivering to DTNd: {e}"
+            msg.error_log += (
+                f"\n{datetime.utcnow().isoformat()} ERROR Failure delivering to DTNd: {e}"
+            )
             await msg.save()
         except Exception as e:  # noqa E722
             logger.warning(f"Could not update the error log of spool entry for message {hash}: {e}")
