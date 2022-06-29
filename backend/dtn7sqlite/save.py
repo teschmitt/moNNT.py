@@ -1,16 +1,18 @@
 import asyncio
-from hashlib import sha256
 import re
 from collections import defaultdict
 from datetime import datetime
+from hashlib import sha256
 from typing import TYPE_CHECKING, Union
 
 import cbor2
 from cbor2 import CBORDecodeEOF
-from py_dtn7 import from_dtn_timestamp, DTNRESTClient
+from py_dtn7 import from_dtn_timestamp
 
+from backend.dtn7sqlite.config import config
+from backend.dtn7sqlite.utils import get_rest
 from logger import global_logger
-from models import Message, Newsgroup, DTNMessage
+from models import DTNMessage, Message, Newsgroup
 from settings import settings
 
 if TYPE_CHECKING:
@@ -75,8 +77,8 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     dtn_args: dict = {
         "source": f"dtn://{domain_email}/mail/{name_email}",
         "destination": f"dtn://{group_name}/~news",
-        "delivery_notification": settings.DTN_DELIV_NOTIFICATION,
-        "lifetime": settings.DTN_BUNDLE_LIFETIME,
+        "delivery_notification": config["bundles"]["deliv_notification"],
+        "lifetime": config["bundles"]["lifetime"],
     }
 
     message_hash = get_article_hash(
@@ -99,7 +101,7 @@ async def send_to_dtnd(
     logger = global_logger()
     logger.debug(f"Registering message source as endpoint: {dtn_args['source']}")
     try:
-        rest: DTNRESTClient = DTNRESTClient()
+        rest = await get_rest()
         rest.register(endpoint=dtn_args["source"])
         logger.debug(f"Sending article to DTNd with {dtn_args}")
         server_state.backend.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))

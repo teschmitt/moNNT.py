@@ -1,16 +1,17 @@
 import asyncio
 import time
 from threading import Thread
-from typing import Coroutine
+from typing import Optional
 
 import cbor2
-from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
+from py_dtn7 import DTNRESTClient, DTNWSClient, from_dtn_timestamp
 from tortoise import Tortoise, run_async
 
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
-from backend.dtn7sqlite.save import ws_handler, send_to_dtnd
+from backend.dtn7sqlite.save import send_to_dtnd, ws_handler
+from backend.dtn7sqlite.utils import get_rest
 from logger import global_logger
-from models import Newsgroup, Message
+from models import Message, Newsgroup
 from nntp_server import AsyncTCPServer
 from settings import settings
 from utils import get_version
@@ -48,18 +49,26 @@ async def send_all(msgs: list[dict], server: AsyncTCPServer):
 
 async def ingest_all_from_dtnd() -> None:
     logger.debug("Ingesting all newsgroup bundles in DTNd bundle store.")
-    rest: DTNRESTClient = DTNRESTClient()
-    all_groups: list[str] = await get_all_newsgroups()
+
+    all_groups: list[str]
+    rest: Optional[DTNRESTClient]
+    all_groups, rest = await asyncio.gather(get_all_newsgroups(), get_rest())
     logger.debug(f"Found {len(all_groups)} active newsgroups on this server.")
-    all_bundles: filter[Bundle] = filter(
+
+    if rest is None:
+        return
+
+    all_bundles: filter = filter(
         lambda b: b.destination.replace("dtn://", "").replace("//", "").replace("/~news", "")
         in all_groups,
-        rest.get_all_bundles()
+        rest.get_all_bundles(),
     )
 
     for bundle in all_bundles:
-        msg_id: str = (f"<{bundle.timestamp}-{bundle.sequence_number}@"
-                       f"{bundle.source.replace('dtn://', '').replace('/', '-')}.dtn>")
+        msg_id: str = (
+            f"<{bundle.timestamp}-{bundle.sequence_number}@"
+            f"{bundle.source.replace('dtn://', '').replace('/', '-')}.dtn>"
+        )
 
         mail_domain, mail_name = (
             bundle.source.replace("dtn://", "").replace("//", "").split("/mail/", maxsplit=1)
@@ -97,8 +106,6 @@ def deliver_spool(server: AsyncTCPServer):
     # exponential backoff again:
     retries: int = 0
     initial_wait: float = 0.1
-    max_retries: int = 20
-    reconn_pause: int = 300
     while not server.backend.running:
         logger.debug(
             f"WebSocket backend not started, waiting for {(retries ** 2) * initial_wait} seconds"
@@ -122,15 +129,17 @@ def reconnect_handler(server: AsyncTCPServer):
         # register and subscribe to all newsgroup endpoints
         try:
             # TODO: add args for port and host from settings here:
-            rest = DTNRESTClient()
+            rest = asyncio.run(get_rest())
+            if rest is None:
+                return
             asyncio.new_event_loop().run_until_complete(register_all_groups(client=rest))
             ws_client = DTNWSClient(
                 callback=ws_handler, endpoints=filter(lambda eid: "/~news" in eid, rest.endpoints)
             )
             server.backend = ws_client
         except Exception as e:
-            # requests is kind of stingy raising errors ... I was not able to catch a MaxRetries or ConnectionError
-            # so for now we'll just catch all exceptions and get on with our lives.
+            # requests is kind of stingy raising errors ... I was not able to catch a MaxRetries or
+            # ConnectionError so for now we'll just catch all exceptions and get on with our lives.
             retries += 1
             logger.warning(e)
             if retries <= max_retries:
