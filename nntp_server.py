@@ -7,6 +7,7 @@ from typing import List, Optional, Union
 from py_dtn7 import DTNRESTClient, DTNWSClient
 
 from backend.dtn7sqlite import nntp_commands
+from backend.dtn7sqlite.backend import Backend
 from backend.dtn7sqlite.save import save_article
 from logger import global_logger
 from models import Message, Newsgroup
@@ -22,7 +23,7 @@ class NNTPServer(ForkingTCPServer):
 
 
 class AsyncTCPServer:
-    def __init__(self, hostname: str, port: int, backend: Optional[DTNWSClient]) -> None:
+    def __init__(self, hostname: str, port: int, backend: Optional[Backend]) -> None:
         self.hostname: str = hostname
         self.port: int = port
         self.reader: StreamReader
@@ -37,7 +38,7 @@ class AsyncTCPServer:
         self._post_mode: bool = False
         self._article_buffer: list[str] = []
         self._command: Optional[str]
-        self._backend: Optional[DTNWSClient] = backend
+        self._backend: Optional[Backend] = backend
         # self.auth_username
 
     def _send(self, send_obj: Union[List[str], str]) -> None:
@@ -157,6 +158,8 @@ class AsyncTCPServer:
         await asyncio.start_server(
             client_connected_cb=self._accept_client, host=self.hostname, port=self.port
         )
+        if self.backend is not None:
+            self.backend.start()
 
     def stop_serving(self) -> None:
         self._terminated = True

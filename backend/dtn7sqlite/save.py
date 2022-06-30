@@ -2,7 +2,6 @@ import asyncio
 import re
 from collections import defaultdict
 from datetime import datetime
-from hashlib import sha256
 from typing import TYPE_CHECKING, Union
 
 import cbor2
@@ -10,7 +9,7 @@ from cbor2 import CBORDecodeEOF
 from py_dtn7 import from_dtn_timestamp
 
 from backend.dtn7sqlite.config import config
-from backend.dtn7sqlite.utils import get_rest
+from backend.dtn7sqlite.utils import get_rest, get_article_hash
 from logger import global_logger
 from models import DTNMessage, Message, Newsgroup
 from settings import settings
@@ -214,10 +213,3 @@ async def handle_sent_article(ws_struct: dict):
         logger.error(
             f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead of 1"
         )
-
-
-def get_article_hash(source: str, destination: str, data: dict) -> str:
-    return sha256(
-        f"{source}+{destination}+{data['subject']}+{data['body']}+{data['references']}+"
-        f"{data['reply_to']}".encode(encoding="utf-8")
-    ).hexdigest()

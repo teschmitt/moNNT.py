@@ -6,7 +6,10 @@ node_id = ""
 rest_path = ""
 ws_path = "/ws"
 
-
+[backoff]
+initial_wait = 0.1
+max_retries = 20
+reconn_pause = 300
 
 [bundles]
 lifetime = 86400000

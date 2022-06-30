@@ -1,4 +1,5 @@
 import time
+from hashlib import sha256
 from logging import Logger
 from typing import Optional
 
@@ -51,3 +52,10 @@ async def get_rest() -> DTNRESTClient:
             retries += 1
 
     return rest
+
+
+def get_article_hash(source: str, destination: str, data: dict) -> str:
+    return sha256(
+        f"{source}+{destination}+{data['subject']}+{data['body']}+{data['references']}+"
+        f"{data['reply_to']}".encode(encoding="utf-8")
+    ).hexdigest()
