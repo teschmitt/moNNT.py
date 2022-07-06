@@ -175,9 +175,7 @@ if __name__ == "__main__":
     logger.info(f"moNNT.py Usenet Server {get_version()}")
     run_async(init_db())
     loop = asyncio.new_event_loop()
-    nntp_server = AsyncTCPServer(
-        hostname=settings.NNTP_HOSTNAME, port=settings.NNTP_PORT, backend=None
-    )
+    nntp_server = AsyncTCPServer(hostname=settings.NNTP_HOSTNAME, port=settings.NNTP_PORT)
 
     """
     --------------------------------------------------------------------------------------------------------------------

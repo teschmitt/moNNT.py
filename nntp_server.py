@@ -4,8 +4,6 @@ from logging import Logger
 from socketserver import ForkingTCPServer
 from typing import List, Optional, Union
 
-from py_dtn7 import DTNRESTClient, DTNWSClient
-
 from backend.dtn7sqlite import nntp_commands
 from backend.dtn7sqlite.backend import Backend
 from backend.dtn7sqlite.save import save_article
@@ -23,7 +21,7 @@ class NNTPServer(ForkingTCPServer):
 
 
 class AsyncTCPServer:
-    def __init__(self, hostname: str, port: int, backend: Optional[Backend]) -> None:
+    def __init__(self, hostname: str, port: int) -> None:
         self.hostname: str = hostname
         self.port: int = port
         self.reader: StreamReader
@@ -38,7 +36,7 @@ class AsyncTCPServer:
         self._post_mode: bool = False
         self._article_buffer: list[str] = []
         self._command: Optional[str]
-        self._backend: Optional[Backend] = backend
+        self._backend: Optional[Backend] = None
         # self.auth_username
 
     def _send(self, send_obj: Union[List[str], str]) -> None:
@@ -173,7 +171,7 @@ class AsyncTCPServer:
         return self._backend
 
     @backend.setter
-    def backend(self, new_backend: DTNWSClient):
+    def backend(self, new_backend: Backend):
         self._backend = new_backend
 
     @property

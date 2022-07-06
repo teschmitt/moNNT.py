@@ -4,18 +4,18 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from logging import Logger
 from threading import Thread
-from typing import Optional, Union, TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Optional, Union
 
 import cbor2
 from cbor2 import CBORDecodeEOF
-from py_dtn7 import DTNWSClient, DTNRESTClient, from_dtn_timestamp, Bundle
+from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
 from tortoise import Tortoise, run_async
-from urllib3.exceptions import NewConnectionError, MaxRetryError
+from urllib3.exceptions import MaxRetryError, NewConnectionError
 
-from backend.dtn7sqlite import get_all_spooled_messages, get_all_newsgroups
+from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
 from backend.dtn7sqlite.config import config
 from logger import global_logger
-from models import DTNMessage
+from models import DTNMessage, Message, Newsgroup
 from settings import settings
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ class Backend(ABC):
 
 
 class DTN7Backend(Backend):
-    _groups: list[str]
+    _group_names: list[str]
     _ready_to_send: bool
     _rest_client: Optional[DTNRESTClient]
     _rest_runner: Optional[Thread]
@@ -67,7 +67,7 @@ class DTN7Backend(Backend):
         gracefully if it can't be established.
         """
         run_async(self._init_db())
-        self._groups: list[str] = asyncio.new_event_loop().run_until_complete(get_all_newsgroups())
+        self._group_names: list[str] = asyncio.run(get_all_newsgroups())
 
         self._ready_to_send = False
         self._rest_client = None
@@ -89,17 +89,36 @@ class DTN7Backend(Backend):
         :return: None
         """
 
+        t: Thread = Thread(target=self._start_threaded_tasks, daemon=True)
+        self._thread_runners.append(t)
+        t.start()
+
+    def _start_threaded_tasks(self):
+        """
+        Initialize connections first and then run the start tasks
+        :return: None
+        """
+        start_runner: list[Thread] = []
         for c in [
             self._ws_connector,
             self._rest_connector,
-            self._register_all_groups,
-            self._ingest_all_from_dtnd,
-            self._deliver_spool
         ]:
             t = Thread(target=c, daemon=True)
             t.start()
-            self._thread_runners.append(t)
+            start_runner.append(t)
+        for t in start_runner:
+            t.join()
 
+        for c in [
+            self._register_all_groups,
+            self._ingest_all_from_dtnd,
+            self._deliver_spool,
+        ]:
+            t = Thread(target=c, daemon=True)
+            t.start()
+            start_runner.append(t)
+        for t in start_runner:
+            t.join()
 
     def save_article(self) -> None:
         pass
@@ -148,7 +167,7 @@ class DTN7Backend(Backend):
             try:
                 self._ws_client = DTNWSClient(
                     callback=self._ws_data_handler,
-                    endpoints=self._groups,
+                    endpoints=self._group_names,
                 )
             except ConnectionError as e:
                 retries += 1
@@ -177,8 +196,8 @@ class DTN7Backend(Backend):
         self.logger.info("Permanently stopped backend (WebSocket Client)")
 
     def _rest_connector(self) -> None:
-        # TODO: in the backend object, install a periodic task that checks to see of the REST connection
-        # is still alive.
+        # TODO: in the backend object, install a periodic task that checks to see of the REST
+        #  connection is still alive.
         # - Maybe even a decorator for every function that contains a rest call to enable
         #   exponentioal backoff?
         # - Every rest call has to be wrapped in a try catch block that reinstates the REST client
@@ -203,7 +222,7 @@ class DTN7Backend(Backend):
             except ConnectionError | NewConnectionError | MaxRetryError as e:
                 self.logger.exception(e)
                 if retries >= max_retries:
-                    self.logger.error(f"DTNd REST interface not available, not trying again")
+                    self.logger.error("DTNd REST interface not available, not trying again")
                     break
                 new_sleep: int = (retries**2) * initial_wait
                 self.logger.debug(
@@ -271,7 +290,7 @@ class DTN7Backend(Backend):
             )
             time.sleep((retries**2) * initial_wait)
             retries += 1
-
+        print(msgs)
 
     def _register_all_groups(self) -> None:
         """
@@ -283,32 +302,29 @@ class DTN7Backend(Backend):
         while not self.server.terminated and self._rest_client is None:
             time.sleep(0.5)
         if self._rest_client is not None:
-            for group_name in self._groups:
+            for group_name in self._group_names:
                 self.logger.debug(
                     f"Registering endpoint with REST client: dtn://{group_name}/~news"
                 )
                 self._rest_client.register(endpoint=f"dtn://{group_name}/~news")
             self._ready_to_send = True
 
-    def _ingest_all_from_dtnd(self) -> None:
+    async def _ingest_all_from_dtnd(self) -> None:
         self.logger.debug("Ingesting all newsgroup bundles in DTNd bundle store.")
-        self.logger.debug(f"Found {len(self._groups)} active newsgroups on this server.")
+        self.logger.debug(f"Found {len(self._group_names)} active newsgroups on this server.")
 
         # wait for REST client to come online
-        while self._rest_client is None:
+        while not self.server.terminated and self._rest_client is None:
             time.sleep(0.5)
 
         received_bundles: list[Bundle] = []
-        for group in self._groups:
-            received_bundles.append(self._rest_client.get_filtered_bundles(address_part_criteria=)
+        if self._rest_client is not None:
+            for group_name in self._group_names:
+                received_bundles.append(
+                    self._rest_client.get_filtered_bundles(address_part_criteria=group_name)
+                )
 
-        all_bundles: filter = filter(
-            lambda b: b.destination.replace("dtn://", "").replace("//", "").replace("/~news", "")
-            in self._groups,
-            rest.get_all_bundles(),
-        )
-
-        for bundle in all_bundles:
+        for bundle in received_bundles:
             msg_id: str = (
                 f"<{bundle.timestamp}-{bundle.sequence_number}@"
                 f"{bundle.source.replace('dtn://', '').replace('/', '-')}.dtn>"
