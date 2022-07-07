@@ -10,7 +10,15 @@ ws_path = "/ws"
 initial_wait = 0.1
 max_retries = 20
 reconn_pause = 300
+constant_wait = 0.75
 
 [bundles]
 lifetime = 86400000
 deliv_notification = true
+
+[usenet]
+newsgroups = [
+    "germany.hessen.darmstadt.darmstadt",
+    "germany.hessen.darmstadt-dieburg.dieburg",
+    "germany.hessen.darmstadt-dieburg.rossdorf"
+]

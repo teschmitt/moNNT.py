@@ -5,9 +5,10 @@ from typing import Optional
 
 import cbor2
 from py_dtn7 import DTNRESTClient, DTNWSClient, from_dtn_timestamp
-from tortoise import Tortoise, run_async
+from tortoise import Tortoise
 
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
+from backend.dtn7sqlite.backend import DTN7Backend
 from backend.dtn7sqlite.save import send_to_dtnd, ws_handler
 from backend.dtn7sqlite.utils import get_rest
 from logger import global_logger
@@ -173,26 +174,17 @@ if __name__ == "__main__":
     logger = global_logger()
 
     logger.info(f"moNNT.py Usenet Server {get_version()}")
-    run_async(init_db())
+
+    """
+    Required procedure:
+    1. create server
+    2. attach backend
+    3. start backend
+    4. start server
+    """
     loop = asyncio.new_event_loop()
     nntp_server = AsyncTCPServer(hostname=settings.NNTP_HOSTNAME, port=settings.NNTP_PORT)
-
-    """
-    --------------------------------------------------------------------------------------------------------------------
-    This is where the not so clean code begins
-    TODO: make a Backend class that encapsulates all of this logic in its __init__ or something
-    """
-
-    reconn_task: Thread = Thread(target=reconnect_handler, kwargs={"server": nntp_server})
-    reconn_task.daemon = True
-    reconn_task.start()
-
-    asyncio.run(ingest_all_from_dtnd())
-
-    """
-    --------------------------------------------------------------------------------------------------------------------
-    This is where the not so clean code ends
-    """
+    nntp_server.backend = DTN7Backend(server=nntp_server)
 
     loop.run_until_complete(nntp_server.start_serving())
     try:
@@ -200,5 +192,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Received Ctrl-C, stopping server")
         nntp_server.stop_serving()
-
-    reconn_task.join()
+        print("Stopped server")
+    finally:
+        loop.close()
