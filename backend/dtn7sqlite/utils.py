@@ -1,4 +1,4 @@
-import time
+import asyncio
 from hashlib import sha256
 from logging import Logger
 from typing import Optional
@@ -48,7 +48,7 @@ async def get_rest() -> DTNRESTClient:
                 break
             new_sleep: int = (retries**2) * initial_wait
             logger.debug(f"DTNd REST interface not available, waiting for {new_sleep} seconds")
-            time.sleep(new_sleep)
+            await asyncio.sleep(new_sleep)
             retries += 1
 
     return rest

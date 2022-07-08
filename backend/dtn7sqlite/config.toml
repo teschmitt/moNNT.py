@@ -14,7 +14,7 @@ constant_wait = 0.75
 
 [bundles]
 lifetime = 86400000
-deliv_notification = true
+deliv_notification = false
 
 [usenet]
 newsgroups = [

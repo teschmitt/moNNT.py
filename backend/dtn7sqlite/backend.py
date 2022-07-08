@@ -13,6 +13,7 @@ from tortoise import Tortoise, run_async
 
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
 from backend.dtn7sqlite.config import config
+from backend.dtn7sqlite.utils import get_article_hash
 from logger import global_logger
 from models import DTNMessage, Message, Newsgroup
 from settings import settings
@@ -93,15 +94,14 @@ class DTN7Backend(Backend):
         Initialize connections first and then run the start tasks
         :return: None
         """
-        await self._connect_clients()
-        await self._update_server()
+        self._rest_connector()
 
-    async def _connect_clients(self):
-        await self._rest_connector()
-        await self._register_all_groups()
-        asyncio.ensure_future(self._ws_connector())
+        # execute the WS connector in a new thread
+        # asyncio.new_event_loop().run_until_complete(self._ws_connector())
+        t: Thread = Thread(target=self._ws_connector, daemon=True)
+        self._thread_runners.append(t)
+        t.start()
 
-    async def _update_server(self):
         await self._ingest_all_from_dtnd()
         await self._deliver_spool()
 
@@ -132,8 +132,8 @@ class DTN7Backend(Backend):
         )
 
     async def _send_to_dtnd(self, dtn_args: dict, dtn_payload: dict, hash_: str):
-        while self._ws_client is None:
-            self.logger.debug("Waiting for WC client to come online")
+        while not self._ws_client.running:
+            self.logger.debug("Waiting for WS client to come online")
             await asyncio.sleep(config["backoff"]["constant_wait"])
         try:
             self.logger.debug(f"Sending article to DTNd with {dtn_args}")
@@ -156,7 +156,7 @@ class DTN7Backend(Backend):
                     f"Could not update the error log of spool entry for message {hash_}: {e}"
                 )
 
-    async def _register_all_groups(self) -> None:
+    def _register_all_groups(self) -> None:
         """
         First gets all active newsgroups from the DB. Then waits for the REST client to go online
         and then registers all groups with the DTNd backend.
@@ -172,8 +172,7 @@ class DTN7Backend(Backend):
 
         while self._rest_client is None:
             self.logger.debug("Waiting for REST client to come online")
-            await self._rest_connector()
-            await self._register_all_groups()
+            self._rest_connector()
 
         received_bundles: list[Bundle] = []
         if self._rest_client is not None:
@@ -182,7 +181,6 @@ class DTN7Backend(Backend):
                     self._rest_client.get_filtered_bundles(address_part_criteria=group_name)
                 )
 
-        print(f"{received_bundles=}")
         for bundle in received_bundles:
             msg_id: str = (
                 f"<{bundle.timestamp}-{bundle.sequence_number}@"
@@ -210,7 +208,7 @@ class DTN7Backend(Backend):
                 body=data["body"],
                 # path=f"!{settings.DOMAIN_NAME}",
                 references=data["references"],
-                reply_to=data["reply-to"],
+                reply_to=data["reply_to"],
             )
             if created:
                 self.logger.debug(
@@ -226,7 +224,7 @@ class DTN7Backend(Backend):
         await Tortoise.init(db_url=settings.DB_URL, modules={"models": ["models"]})
         self.logger.info(f"Connected to database {settings.DB_URL}")
 
-    async def _ws_connector(self) -> None:
+    def _ws_connector(self) -> None:
         """
         Must be run in a Thread and will keep a WS-connection open for as long as the
         server lives. Reconnects automatically when the connection drops and uses exponential
@@ -273,12 +271,11 @@ class DTN7Backend(Backend):
             # before we can try reconnecting to the WS interface
             self._rest_client = None
             self._ws_client = None
-            await self._rest_connector()
-            await self._register_all_groups()
+            self._rest_connector()
 
         self.logger.info("Permanently stopped backend (WebSocket Client)")
 
-    async def _rest_connector(self) -> None:
+    def _rest_connector(self) -> None:
         # TODO: in the backend object, install a periodic task that checks to see of the REST
         #  connection is still alive.
         # - Maybe even a decorator for every function that contains a rest call to enable
@@ -314,6 +311,13 @@ class DTN7Backend(Backend):
                 )
                 time.sleep(new_sleep)
                 retries += 1
+            else:
+                # register all groups with the DTNd backend.
+                for group_name in self._group_names:
+                    self.logger.debug(
+                        f"Registering endpoint with REST client: dtn://{group_name}/~news"
+                    )
+                    self._rest_client.register(endpoint=f"dtn://{group_name}/~news")
 
     def _ws_data_handler(self, ws_data: Union[str | bytes]) -> None:
         """
@@ -359,3 +363,56 @@ class DTN7Backend(Backend):
 
         else:
             raise ValueError("Handler received unrecognizable data.")
+
+    async def handle_sent_article(self, ws_struct: dict):
+        self.logger.debug("Mapping BP7 to NNTP fields")
+
+        # map BP7 to NNTP fields
+        sender_data: list[str] = ws_struct["src"].replace("dtn://", "").replace("//", "").split("/")
+        sender: str = f"{sender_data[-1]}@{sender_data[0]}"
+
+        group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
+
+        bid_data: list[str] = ws_struct["bid"].split("-")
+        src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
+        seq_str: str = bid_data[-1]
+        ts_str: str = bid_data[-2]
+
+        dt: datetime = from_dtn_timestamp(int(ts_str))
+        msg_id: str = f"<{ts_str}-{seq_str}@{src_like}.dtn>"
+
+        msg_data: dict = cbor2.loads(ws_struct["data"])
+
+        self.logger.debug("Creating article entry in newsgroup DB")
+        group = await Newsgroup.get_or_none(name=group_name)
+        # TODO: Error handling in case group does not exist
+        msg: Message = await Message.create(
+            newsgroup=group,
+            from_=sender,
+            subject=msg_data["subject"],
+            created_at=dt,
+            message_id=msg_id,
+            body=msg_data["body"],
+            path=f"!{settings.DOMAIN_NAME}",
+            references=msg_data["references"],
+            reply_to=msg_data["reply_to"],
+            # organization=header["organization"],
+            # user_agent=header["user-agent"],
+        )
+        self.logger.debug(f"Created new entry with id {msg.id} in articles table")
+
+        # remove message from spool
+        article_hash = get_article_hash(
+            source=ws_struct["src"],
+            destination=ws_struct["dst"],
+            data=msg_data,
+        )
+        self.logger.debug(f"Removing corresponding entry from dtnd message spool: {article_hash}")
+        del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
+        if del_cnt == 1:
+            self.logger.debug("Successful, removed spool entry")
+        else:
+            self.logger.error(
+                f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead"
+                " of 1"
+            )
