@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS "dtnmessage" (
     "delivery_notification" INT NOT NULL  DEFAULT 0,
     "lifetime" INT NOT NULL  DEFAULT 86400000,
     "retries" INT NOT NULL  DEFAULT 0,
-    "hash" VARCHAR(64) NOT NULL,
     "error_log" TEXT,
+    "hash" VARCHAR(64) NOT NULL,
     "created_at" TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS "newsgroup" (
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS "message" (
     "created_at" TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP,
     "subject" VARCHAR(255) NOT NULL,
     "message_id" VARCHAR(255) NOT NULL,
-    "path" TEXT NOT NULL,
+    "path" TEXT,
     "references" TEXT,
     "reply_to" VARCHAR(255),
     "organization" VARCHAR(255),

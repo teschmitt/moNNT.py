@@ -27,7 +27,7 @@ class Message(Model):
     created_at = fields.DatetimeField(auto_now_add=True, null=False)
     subject = fields.CharField(max_length=255, null=False)
     message_id = fields.CharField(max_length=255, null=False)
-    path = fields.TextField(null=False)
+    path = fields.TextField(null=True)
 
     newsgroup: fields.ForeignKeyRelation[Newsgroup] = fields.ForeignKeyField(
         "models.Newsgroup", related_name="messages"
