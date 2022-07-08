@@ -1,6 +1,8 @@
 import asyncio
+import re
 import time
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from datetime import datetime
 from logging import Logger
 from threading import Thread
@@ -9,6 +11,7 @@ from typing import TYPE_CHECKING, Optional, Union
 import cbor2
 from cbor2 import CBORDecodeEOF
 from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
+from requests.exceptions import ConnectionError
 from tortoise import Tortoise, run_async
 
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
@@ -217,8 +220,80 @@ class DTN7Backend(Backend):
             else:
                 self.logger.debug(f"Article {msg_id} already present in newsgroup '{group.name}'.")
 
-    def save_article(self) -> None:
-        pass
+    async def save_article(self) -> None:
+        # TODO: support cross posting to multiple newsgroups
+        #       this entails setting up a M2M relationship between message and newsgroup
+        #       https://kb.iu.edu/d/affn
+        logger = global_logger()
+        logger.debug("Sending article to DTNd and local DTN message spool")
+        header: defaultdict[str] = defaultdict(str)
+        line: str = self.server.article_buffer.pop(0)
+        field_name: str = ""
+        field_value: str
+        while len(line) != 0:
+            try:
+                if ":" in line:
+                    field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
+                    field_name = field_name.strip().lower()
+                    header[field_name] = field_value.strip()
+                elif len(field_name) > 0:
+                    header[field_name] = f"{header[field_name]} {line}"
+            except ValueError:
+                # something clients send fishy headers … we'll just ignore them.
+                pass
+            line = self.server.article_buffer.pop(0)
+
+        group = await Newsgroup.get_or_none(name=header["newsgroups"])
+        # TODO: Error handling when newsgroup is not in DB
+
+        # we've popped off the complete header, body is just the joined rest
+        body: str = "\n".join(self.server.article_buffer)
+        # dt: datetime = date_parse(
+        #   header["date"]) if len(header["date"]) > 0 else datetime.utcnow()
+
+        # some cleaning up:
+        header["references"].replace("\t", "")
+
+        group_name: str = group.name
+        dtn_payload: dict = {
+            # "newsgroup": group_name,
+            # "from": header["from"],
+            "subject": header["subject"],
+            # "created_at": dt.isoformat(),
+            # "message_id": f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
+            "body": body,
+            # "path": f"!{settings.DOMAIN_NAME}",
+            "references": header["references"],
+            "reply_to": header["reply-to"],
+            # "organization": header["organization"],
+            # "user_agent": header["user-agent"],
+        }
+
+        try:
+            sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
+        except AttributeError as e:
+            logger.warning(f"Email address could ot be parsed: {e}")
+            sender_email: str = "not-recognized@email-address.net"
+        name_email, domain_email = sender_email.split("@")
+        # TODO: get lifetime, destination settings from settings:
+        dtn_args: dict = {
+            "source": f"dtn://{domain_email}/mail/{name_email}",
+            "destination": f"dtn://{group_name}/~news",
+            "delivery_notification": config["bundles"]["deliv_notification"],
+            "lifetime": config["bundles"]["lifetime"],
+        }
+
+        message_hash = get_article_hash(
+            source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
+        )
+        logger.debug(f"Got message hash: {message_hash}")
+
+        dtn_msg: DTNMessage = await DTNMessage.create(
+            **dtn_args, data=dtn_payload, hash=message_hash
+        )
+        logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
+
+        await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
 
     async def _init_db(self) -> None:
         await Tortoise.init(db_url=settings.DB_URL, modules={"models": ["models"]})
@@ -300,8 +375,7 @@ class DTN7Backend(Backend):
             try:
                 self._rest_client = DTNRESTClient(host=host, port=port)
                 self.logger.debug("Successfully contacted REST interface")
-            except Exception as e:
-                self.logger.exception(e)
+            except ConnectionError:
                 if retries >= max_retries:
                     self.logger.error("DTNd REST interface not available, not trying again")
                     break
@@ -354,9 +428,7 @@ class DTN7Backend(Backend):
 
             try:
                 self.logger.debug("Starting data handler.")
-                asyncio.new_event_loop().run_until_complete(
-                    self.handle_sent_article(ws_struct=ws_dict)
-                )
+                asyncio.run(self._handle_sent_article(ws_struct=ws_dict))
             except Exception as e:  # noqa E722
                 # TODO: do some error handling here
                 raise Exception(e)
@@ -364,7 +436,7 @@ class DTN7Backend(Backend):
         else:
             raise ValueError("Handler received unrecognizable data.")
 
-    async def handle_sent_article(self, ws_struct: dict):
+    async def _handle_sent_article(self, ws_struct: dict):
         self.logger.debug("Mapping BP7 to NNTP fields")
 
         # map BP7 to NNTP fields

@@ -6,7 +6,6 @@ from typing import List, Optional, Union
 
 from backend.dtn7sqlite import nntp_commands
 from backend.dtn7sqlite.backend import Backend
-from backend.dtn7sqlite.save import save_article
 from logger import global_logger
 from models import Message, Newsgroup
 from settings import settings
@@ -107,7 +106,7 @@ class AsyncTCPServer:
                 data_decode = incoming_data.decode(encoding="utf-8").rstrip()
                 if data_decode == ".":
                     try:
-                        await save_article(self)
+                        await self.backend.save_article()
                         self._send(StatusCodes.STATUS_POSTSUCCESSFUL)
                     except Exception as e:  # noqa E722
                         self.logger.error(e)
