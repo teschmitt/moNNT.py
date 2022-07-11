@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseSettings, Field, BaseModel
+from pydantic import BaseSettings, Field
 
 
 class GlobalSettings(BaseSettings):
@@ -22,12 +22,12 @@ class GlobalSettings(BaseSettings):
     NNTP_PORT: Optional[int] = None
     # type of server ('read-only' or 'read-write')
     SERVER_TYPE: Optional[str] = None
-    ## authentication settings ('yes' or 'no')
+    # authentication settings ('yes' or 'no')
     NNTP_AUTH: Optional[str] = None
     # authentication backend that papercut will use to authenticate the users.
     AUTH_BACKEND: Optional[str] = None
 
-    ## cache settings ##
+    # cache settings
 
     # whether to enable the cache system (may need a lot of diskspace). Valid
     # choices are 'yes' or 'no'.

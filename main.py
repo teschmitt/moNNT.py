@@ -30,4 +30,5 @@ if __name__ == "__main__":
         nntp_server.stop_serving()
         print("Stopped server")
     finally:
+        loop.stop()
         loop.close()

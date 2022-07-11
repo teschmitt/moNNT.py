@@ -1,12 +1,11 @@
 import asyncio
 import re
 import time
-from abc import ABC, abstractmethod
+from asyncio import AbstractEventLoop
 from collections import defaultdict
 from datetime import datetime
-from logging import Logger
 from threading import Thread
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Union
 
 import cbor2
 from cbor2 import CBORDecodeEOF
@@ -14,10 +13,29 @@ from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
 from requests.exceptions import ConnectionError
 from tortoise import Tortoise, run_async
 
+from backend.base import Backend
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
 from backend.dtn7sqlite.config import config
+from backend.dtn7sqlite.nntp_commands import (
+    article,
+    capabilities,
+    date,
+    group,
+    hdr,
+    head_body_stat,
+    help,
+    last,
+    list_command,
+    listgroup,
+    mode,
+    newgroups,
+    newnews,
+    next,
+    over,
+    post,
+    quit_,
+)
 from backend.dtn7sqlite.utils import get_article_hash
-from logger import global_logger
 from models import DTNMessage, Message, Newsgroup
 from settings import settings
 
@@ -25,37 +43,37 @@ if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
 
 
-class Backend(ABC):
-    logger: Logger
-    server: "AsyncTCPServer"
-
-    def __init__(self, server: "AsyncTCPServer"):
-        self.logger = global_logger()
-        self.server = server
-
-    @abstractmethod
-    def start(self):
-        pass
-
-    @abstractmethod
-    def call_command(self):
-        pass
-
-    @abstractmethod
-    async def save_article(self):
-        pass
-
-    @abstractmethod
-    def stop(self):
-        pass
-
-
 class DTN7Backend(Backend):
+    _call_dict: ClassVar[dict[str, Callable]] = {
+        "article": article.do_article,
+        "body": head_body_stat.do_head_body_stat,
+        "capabilities": capabilities.do_capabilities,
+        "date": date.do_date,
+        "group": group.do_group,
+        "hdr": hdr.do_hdr,
+        "head": head_body_stat.do_head_body_stat,
+        "help": help.do_help,
+        "last": last.do_last,
+        "list": list_command.do_list,
+        "listgroup": listgroup.do_listgroup,
+        "mode": mode.do_mode,
+        "newgroups": newgroups.do_newgroups,
+        "newnews": newnews.do_newnews,
+        "next": next.do_next,
+        "over": over.do_over,
+        "post": post.do_post,
+        "quit": quit_.do_quit,
+        "stat": head_body_stat.do_head_body_stat,
+        "xhdr": hdr.do_hdr,
+        "xover": over.do_over,
+    }
+
     _group_names: list[str]
     _ready_to_send: bool
     _rest_client: Optional[DTNRESTClient]
     _ws_client: Optional[DTNWSClient]
-    _thread_runners: list[Thread]
+    _ws_runner: Optional[Thread]
+    _loop: AbstractEventLoop
 
     def __init__(self, server: "AsyncTCPServer"):
         super().__init__(server)
@@ -68,45 +86,41 @@ class DTN7Backend(Backend):
         gracefully if it can't be established.
         """
         run_async(self._init_db())
-        self._group_names: list[str] = asyncio.run(get_all_newsgroups())
+        self._loop = asyncio.new_event_loop()
+        self._group_names: list[str] = self._loop.run_until_complete(get_all_newsgroups())
 
         self._rest_client = None
         self._ws_client = None
-        self._thread_runners = []
+        self._ws_runner = None
 
-    def call_command(self):
-        pass
+    def call_command(self, nntp_command):
+        return self._loop.run_until_complete(self._call_dict[nntp_command](self.server))
 
     def stop(self) -> None:
         self.logger.info("Stopping DTN7Backend")
-        for t in self._thread_runners:
-            t.join(timeout=config["backoff"]["constant_wait"])
+        self._ws_runner.join(timeout=config["backoff"]["constant_wait"])
+        self._loop.stop()
+        self._loop.close()
 
-    def start(self) -> None:
-        """
-        Initializes all needed connections and starts running the backend.
-        :return: None
-        """
-
-        t: Thread = Thread(target=asyncio.run, args=[self._startup_tasks()], daemon=True)
-        self._thread_runners.append(t)
-        t.start()
-
-    async def _startup_tasks(self):
+    async def start(self) -> None:
         """
         Initialize connections first and then run the start tasks
         :return: None
         """
-        self._rest_connector()
+        self._group_names: list[str] = await get_all_newsgroups()
+        await self._rest_connector()
+        await self._start_ws_client()
 
         # execute the WS connector in a new thread
         # asyncio.new_event_loop().run_until_complete(self._ws_connector())
-        t: Thread = Thread(target=self._ws_connector, daemon=True)
-        self._thread_runners.append(t)
-        t.start()
+        # self._ws_runner = asyncio.create_task(self._ws_connector())
 
         await self._ingest_all_from_dtnd()
         await self._deliver_spool()
+
+    async def _start_ws_client(self):
+        self._ws_runner = Thread(target=self._ws_connector, daemon=True)
+        self._ws_runner.start()
 
     async def _deliver_spool(self) -> None:
         """
@@ -117,7 +131,7 @@ class DTN7Backend(Backend):
         self.logger.debug("Getting spooled msgs")
         msgs: list[dict] = await get_all_spooled_messages()
 
-        self.logger.debug("Sending spooled messages to DTNd")
+        self.logger.debug(f"Sending {len(msgs)} spooled messages to DTNd")
         await asyncio.gather(
             *(
                 self._send_to_dtnd(
@@ -135,7 +149,7 @@ class DTN7Backend(Backend):
         )
 
     async def _send_to_dtnd(self, dtn_args: dict, dtn_payload: dict, hash_: str):
-        while not self._ws_client.running:
+        while self._ws_client is None or not self._ws_client.running:
             self.logger.debug("Waiting for WS client to come online")
             await asyncio.sleep(config["backoff"]["constant_wait"])
         try:
@@ -159,7 +173,7 @@ class DTN7Backend(Backend):
                     f"Could not update the error log of spool entry for message {hash_}: {e}"
                 )
 
-    def _register_all_groups(self) -> None:
+    async def _register_all_groups(self) -> None:
         """
         First gets all active newsgroups from the DB. Then waits for the REST client to go online
         and then registers all groups with the DTNd backend.
@@ -175,7 +189,7 @@ class DTN7Backend(Backend):
 
         while self._rest_client is None:
             self.logger.debug("Waiting for REST client to come online")
-            self._rest_connector()
+            await asyncio.sleep(config["backoff"]["constant_wait"])
 
         received_bundles: list[Bundle] = []
         if self._rest_client is not None:
@@ -187,7 +201,7 @@ class DTN7Backend(Backend):
         for bundle in received_bundles:
             msg_id: str = (
                 f"<{bundle.timestamp}-{bundle.sequence_number}@"
-                f"{bundle.source.replace('dtn://', '').replace('/', '-')}.dtn>"
+                f"{bundle.source.replace('dtn://', '').replace('//', '').replace('/', '-')}.dtn>"
             )
 
             mail_domain, mail_name = (
@@ -209,7 +223,7 @@ class DTN7Backend(Backend):
                 created_at=from_dtn_timestamp(int(bundle.timestamp)),
                 message_id=msg_id,
                 body=data["body"],
-                # path=f"!{settings.DOMAIN_NAME}",
+                # path=f"!_ingest_all_from_dtnd",
                 references=data["references"],
                 reply_to=data["reply_to"],
             )
@@ -220,12 +234,16 @@ class DTN7Backend(Backend):
             else:
                 self.logger.debug(f"Article {msg_id} already present in newsgroup '{group.name}'.")
 
-    async def save_article(self) -> None:
+    def save_article(self) -> None:
         # TODO: support cross posting to multiple newsgroups
         #       this entails setting up a M2M relationship between message and newsgroup
         #       https://kb.iu.edu/d/affn
-        logger = global_logger()
-        logger.debug("Sending article to DTNd and local DTN message spool")
+
+        self._loop.run_until_complete(self._async_save_article())
+
+    async def _async_save_article(self):
+        self.logger.debug("5")
+        self.logger.debug("Sending article to DTNd and local DTN message spool")
         header: defaultdict[str] = defaultdict(str)
         line: str = self.server.article_buffer.pop(0)
         field_name: str = ""
@@ -243,7 +261,9 @@ class DTN7Backend(Backend):
                 pass
             line = self.server.article_buffer.pop(0)
 
-        group = await Newsgroup.get_or_none(name=header["newsgroups"])
+        self.logger.debug("1")
+        article_group = await Newsgroup.get_or_none(name=header["newsgroups"])
+        self.logger.debug("2")
         # TODO: Error handling when newsgroup is not in DB
 
         # we've popped off the complete header, body is just the joined rest
@@ -254,7 +274,7 @@ class DTN7Backend(Backend):
         # some cleaning up:
         header["references"].replace("\t", "")
 
-        group_name: str = group.name
+        group_name: str = article_group.name
         dtn_payload: dict = {
             # "newsgroup": group_name,
             # "from": header["from"],
@@ -272,7 +292,7 @@ class DTN7Backend(Backend):
         try:
             sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
         except AttributeError as e:
-            logger.warning(f"Email address could ot be parsed: {e}")
+            self.logger.warning(f"Email address could ot be parsed: {e}")
             sender_email: str = "not-recognized@email-address.net"
         name_email, domain_email = sender_email.split("@")
         # TODO: get lifetime, destination settings from settings:
@@ -286,12 +306,12 @@ class DTN7Backend(Backend):
         message_hash = get_article_hash(
             source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
         )
-        logger.debug(f"Got message hash: {message_hash}")
+        self.logger.debug(f"Got message hash: {message_hash}")
 
         dtn_msg: DTNMessage = await DTNMessage.create(
             **dtn_args, data=dtn_payload, hash=message_hash
         )
-        logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
+        self.logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
 
         await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
 
@@ -346,11 +366,12 @@ class DTN7Backend(Backend):
             # before we can try reconnecting to the WS interface
             self._rest_client = None
             self._ws_client = None
-            self._rest_connector()
+            self._loop.run_until_complete(self._rest_connector())
+            # await self._rest_connector()
 
         self.logger.info("Permanently stopped backend (WebSocket Client)")
 
-    def _rest_connector(self) -> None:
+    async def _rest_connector(self) -> None:
         # TODO: in the backend object, install a periodic task that checks to see of the REST
         #  connection is still alive.
         # - Maybe even a decorator for every function that contains a rest call to enable
@@ -369,7 +390,7 @@ class DTN7Backend(Backend):
 
         while self._rest_client is None and retries <= max_retries:
             # naive exponential backoff implementation
-            time.sleep((retries**2) * initial_wait)
+            await asyncio.sleep((retries**2) * initial_wait)
             # register and subscribe to all newsgroup endpoints
             self.logger.debug("Contacting DTNs REST interface")
             try:
@@ -383,7 +404,7 @@ class DTN7Backend(Backend):
                 self.logger.debug(
                     f"DTNd REST interface not available, waiting for {new_sleep} seconds"
                 )
-                time.sleep(new_sleep)
+                await asyncio.sleep(new_sleep)
                 retries += 1
             else:
                 # register all groups with the DTNd backend.
@@ -403,7 +424,9 @@ class DTN7Backend(Backend):
         :param ws_data: data sent from the DTNd over the Websockets connection
         :return: None
         """
+        self._loop.run_until_complete(self._async_ws_data_handler(ws_data))
 
+    async def _async_ws_data_handler(self, ws_data: Union[str | bytes]) -> None:
         if isinstance(ws_data, str):
             self.logger.debug(
                 f"Received WebSocket data from DTNd, probably a status message: {ws_data}"
@@ -428,7 +451,7 @@ class DTN7Backend(Backend):
 
             try:
                 self.logger.debug("Starting data handler.")
-                asyncio.run(self._handle_sent_article(ws_struct=ws_dict))
+                await self._handle_sent_article(ws_struct=ws_dict)
             except Exception as e:  # noqa E722
                 # TODO: do some error handling here
                 raise Exception(e)
@@ -458,6 +481,7 @@ class DTN7Backend(Backend):
         self.logger.debug("Creating article entry in newsgroup DB")
         group = await Newsgroup.get_or_none(name=group_name)
         # TODO: Error handling in case group does not exist
+
         msg: Message = await Message.create(
             newsgroup=group,
             from_=sender,
@@ -465,7 +489,7 @@ class DTN7Backend(Backend):
             created_at=dt,
             message_id=msg_id,
             body=msg_data["body"],
-            path=f"!{settings.DOMAIN_NAME}",
+            # path=f"!_handle_sent_article",
             references=msg_data["references"],
             reply_to=msg_data["reply_to"],
             # organization=header["organization"],
@@ -488,3 +512,7 @@ class DTN7Backend(Backend):
                 f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead"
                 " of 1"
             )
+
+    @property
+    def available_commands(self) -> list[str]:
+        return list(self._call_dict.keys())

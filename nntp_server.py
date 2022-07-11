@@ -4,8 +4,7 @@ from logging import Logger
 from socketserver import ForkingTCPServer
 from typing import List, Optional, Union
 
-from backend.dtn7sqlite import nntp_commands
-from backend.dtn7sqlite.backend import Backend
+from backend.base import Backend
 from logger import global_logger
 from models import Message, Newsgroup
 from settings import settings
@@ -106,7 +105,7 @@ class AsyncTCPServer:
                 data_decode = incoming_data.decode(encoding="utf-8").rstrip()
                 if data_decode == ".":
                     try:
-                        await self.backend.save_article()
+                        self.backend.save_article()
                         self._send(StatusCodes.STATUS_POSTSUCCESSFUL)
                     except Exception as e:  # noqa E722
                         self.logger.error(e)
@@ -138,9 +137,9 @@ class AsyncTCPServer:
             self._command = tokens.pop(0) if len(tokens) > 0 else None
             self._cmd_args: Optional[list[str]] = tokens
 
-            if self._command in nntp_commands.call_dict:
+            if self._command in self.backend.available_commands:
                 try:
-                    self._send(await nntp_commands.call_dict[self._command](self))
+                    self._send(self.backend.call_command(self._command))
                 except Exception as e:
                     self.logger.exception(e)
                     self._terminated = True
@@ -156,10 +155,12 @@ class AsyncTCPServer:
             client_connected_cb=self._accept_client, host=self.hostname, port=self.port
         )
         if self.backend is not None:
-            self.backend.start()
+            await self.backend.start()
 
     def stop_serving(self) -> None:
         self._terminated = True
+        if self.backend is not None:
+            self.backend.stop()
 
     @property
     def article_buffer(self):
