@@ -5,6 +5,7 @@ port = 3000
 node_id = ""
 rest_path = ""
 ws_path = "/ws"
+multi_user = false
 
 [backoff]
 initial_wait = 0.1

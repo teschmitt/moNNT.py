@@ -147,6 +147,7 @@ class DTN7Backend(Backend):
                 for msg in msgs
             )
         )
+        self.logger.debug(f"Done sending {len(msgs)} spooled messages to DTNd")
 
     async def _send_to_dtnd(self, dtn_args: dict, dtn_payload: dict, hash_: str):
         while self._ws_client is None or not self._ws_client.running:
@@ -216,6 +217,7 @@ class DTN7Backend(Backend):
 
             data: dict = cbor2.loads(bundle.payload_block.data)
 
+            self.logger.debug(f"Writing article {msg_id} to DB")
             _, created = await Message.get_or_create(
                 newsgroup=group,
                 from_=from_,
@@ -242,7 +244,6 @@ class DTN7Backend(Backend):
         self._loop.run_until_complete(self._async_save_article())
 
     async def _async_save_article(self):
-        self.logger.debug("5")
         self.logger.debug("Sending article to DTNd and local DTN message spool")
         header: defaultdict[str] = defaultdict(str)
         line: str = self.server.article_buffer.pop(0)
@@ -261,9 +262,7 @@ class DTN7Backend(Backend):
                 pass
             line = self.server.article_buffer.pop(0)
 
-        self.logger.debug("1")
         article_group = await Newsgroup.get_or_none(name=header["newsgroups"])
-        self.logger.debug("2")
         # TODO: Error handling when newsgroup is not in DB
 
         # we've popped off the complete header, body is just the joined rest
@@ -306,14 +305,16 @@ class DTN7Backend(Backend):
         message_hash = get_article_hash(
             source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
         )
-        self.logger.debug(f"Got message hash: {message_hash}")
+        self.logger.debug(f"Sending article to DB, got message hash: {message_hash}")
 
+        # TODO: This could be gathered with the next await 5 lines down
         dtn_msg: DTNMessage = await DTNMessage.create(
             **dtn_args, data=dtn_payload, hash=message_hash
         )
         self.logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
-
+        self.logger.debug(f"Sending message {dtn_msg.id} to dtnd")
         await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
+        self.logger.debug(f"Done sending message {dtn_msg.id} to dtnd")
 
     async def _init_db(self) -> None:
         await Tortoise.init(db_url=settings.DB_URL, modules={"models": ["models"]})
@@ -478,12 +479,12 @@ class DTN7Backend(Backend):
 
         msg_data: dict = cbor2.loads(ws_struct["data"])
 
-        self.logger.debug("Creating article entry in newsgroup DB")
-        group = await Newsgroup.get_or_none(name=group_name)
+        self.logger.debug(f"Creating article entry for {msg_id} in newsgroup DB")
+        article_group = await Newsgroup.get_or_none(name=group_name)
         # TODO: Error handling in case group does not exist
 
         msg: Message = await Message.create(
-            newsgroup=group,
+            newsgroup=article_group,
             from_=sender,
             subject=msg_data["subject"],
             created_at=dt,
