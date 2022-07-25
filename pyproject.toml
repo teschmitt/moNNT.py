@@ -8,7 +8,7 @@ authors = ["Thomas Schmitt <t.e.schmitt@posteo.de>"]
 python = "^3.7.1"
 pydantic = {extras = ["dotenv"], version = "^1.9.0"}
 tortoise-orm = "^0.19.0"
-py-dtn7 = {path = "../py-dtn7", develop = true}
+py-dtn7 = "^0.2.1a0"
 nest-asyncio = "^1.5.5"
 
 [tool.poetry.dev-dependencies]
