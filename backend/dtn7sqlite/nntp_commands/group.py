@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, List
 
 from tortoise.functions import Count, Max, Min
 
@@ -22,7 +22,7 @@ async def do_group(server_state: "AsyncTCPServer") -> str:
         411 no such news group
     """
 
-    tokens: list[str] = server_state.cmd_args
+    tokens: List[str] = server_state.cmd_args
 
     if len(tokens) != 1:
         return StatusCodes.ERR_CMDSYNTAXERROR

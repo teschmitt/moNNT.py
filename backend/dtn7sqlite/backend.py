@@ -5,7 +5,7 @@ from asyncio import AbstractEventLoop
 from collections import defaultdict
 from datetime import datetime
 from threading import Thread
-from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Union
+from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Union, List
 
 import cbor2
 from cbor2 import CBORDecodeEOF
@@ -68,7 +68,7 @@ class DTN7Backend(Backend):
         "xover": over.do_over,
     }
 
-    _group_names: list[str]
+    _group_names: List[str]
     _ready_to_send: bool
     _rest_client: Optional[DTNRESTClient]
     _ws_client: Optional[DTNWSClient]
@@ -87,7 +87,7 @@ class DTN7Backend(Backend):
         """
         run_async(self._init_db())
         self._loop = asyncio.new_event_loop()
-        self._group_names: list[str] = self._loop.run_until_complete(get_all_newsgroups())
+        self._group_names: List[str] = self._loop.run_until_complete(get_all_newsgroups())
 
         self._rest_client = None
         self._ws_client = None
@@ -107,7 +107,7 @@ class DTN7Backend(Backend):
         Initialize connections first and then run the start tasks
         :return: None
         """
-        self._group_names: list[str] = await get_all_newsgroups()
+        self._group_names: List[str] = await get_all_newsgroups()
         await self._rest_connector()
         await self._start_ws_client()
 
@@ -129,7 +129,7 @@ class DTN7Backend(Backend):
         :return: None
         """
         self.logger.debug("Getting spooled msgs")
-        msgs: list[dict] = await get_all_spooled_messages()
+        msgs: List[dict] = await get_all_spooled_messages()
 
         self.logger.debug(f"Sending {len(msgs)} spooled messages to DTNd")
         await asyncio.gather(
@@ -192,7 +192,7 @@ class DTN7Backend(Backend):
             self.logger.debug("Waiting for REST client to come online")
             await asyncio.sleep(config["backoff"]["constant_wait"])
 
-        received_bundles: list[Bundle] = []
+        received_bundles: List[Bundle] = []
         if self._rest_client is not None:
             for group_name in self._group_names:
                 received_bundles.extend(
@@ -464,12 +464,12 @@ class DTN7Backend(Backend):
         self.logger.debug("Mapping BP7 to NNTP fields")
 
         # map BP7 to NNTP fields
-        sender_data: list[str] = ws_struct["src"].replace("dtn://", "").replace("//", "").split("/")
+        sender_data: List[str] = ws_struct["src"].replace("dtn://", "").replace("//", "").split("/")
         sender: str = f"{sender_data[-1]}@{sender_data[0]}"
 
         group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
 
-        bid_data: list[str] = ws_struct["bid"].split("-")
+        bid_data: List[str] = ws_struct["bid"].split("-")
         src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
         seq_str: str = bid_data[-1]
         ts_str: str = bid_data[-2]
@@ -515,5 +515,5 @@ class DTN7Backend(Backend):
             )
 
     @property
-    def available_commands(self) -> list[str]:
+    def available_commands(self) -> List[str]:
         return list(self._call_dict.keys())

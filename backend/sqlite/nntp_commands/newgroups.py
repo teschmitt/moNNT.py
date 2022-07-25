@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, List
 
 from tortoise.functions import Max, Min
 
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
 
 
-async def do_newgroups(server_state: "AsyncTCPServer") -> Union[list[str], str]:
+async def do_newgroups(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
     7.3.1.  Usage
 
@@ -26,7 +26,7 @@ async def do_newgroups(server_state: "AsyncTCPServer") -> Union[list[str], str]:
             date    Date in yymmdd or yyyymmdd format
             time    Time in hhmmss format
     """
-    tokens: list[str] = server_state.cmd_args
+    tokens: List[str] = server_state.cmd_args
     if len(tokens) > 3 or (len(tokens) == 3 and tokens[2] != "gmt"):
         # invalid command, return an error-code
         return StatusCodes.ERR_CMDSYNTAXERROR

@@ -28,11 +28,11 @@ class AsyncTCPServer:
         self.logger: Logger = global_logger()
         self._terminated: bool = False
         self._empty_token_counter: int = 0
-        self._cmd_args: Optional[list[str]] = None
+        self._cmd_args: Optional[List[str]] = None
         self._selected_group: Optional[Newsgroup] = None  # field to save a selected group
         self._selected_article: Optional[Message] = None  # field to save a selected group
         self._post_mode: bool = False
-        self._article_buffer: list[str] = []
+        self._article_buffer: List[str] = []
         self._command: Optional[str]
         self._backend: Optional[Backend] = None
         # self.auth_username
@@ -117,7 +117,7 @@ class AsyncTCPServer:
                 continue
 
             try:
-                tokens: list[str] = (
+                tokens: List[str] = (
                     incoming_data.decode(encoding="utf-8").strip().lower().split(" ")
                 )
             except IOError:
@@ -135,7 +135,7 @@ class AsyncTCPServer:
                 self._empty_token_counter = 0
 
             self._command = tokens.pop(0) if len(tokens) > 0 else None
-            self._cmd_args: Optional[list[str]] = tokens
+            self._cmd_args: Optional[List[str]] = tokens
 
             if self._command in self.backend.available_commands:
                 try:
@@ -175,7 +175,7 @@ class AsyncTCPServer:
         self._backend = new_backend
 
     @property
-    def cmd_args(self) -> Optional[list[str]]:
+    def cmd_args(self) -> Optional[List[str]]:
         return self._cmd_args
 
     @property

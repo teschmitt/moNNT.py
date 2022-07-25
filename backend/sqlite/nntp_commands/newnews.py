@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, List
 
 from models import Message, Newsgroup
 from status_codes import StatusCodes
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
 
 
-async def do_newnews(server_state: "AsyncTCPServer") -> Union[list[str], str]:
+async def do_newnews(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
     7.4.1.  Usage
 
@@ -25,7 +25,7 @@ async def do_newnews(server_state: "AsyncTCPServer") -> Union[list[str], str]:
             date       Date in yymmdd or yyyymmdd format
             time       Time in hhmmss format
     """
-    tokens: list[str] = server_state.cmd_args
+    tokens: List[str] = server_state.cmd_args
     if len(tokens) > 4 or (len(tokens) == 4 and tokens[3] != "gmt"):
         # invalid command, return an error-code
         return StatusCodes.ERR_CMDSYNTAXERROR
@@ -38,8 +38,8 @@ async def do_newnews(server_state: "AsyncTCPServer") -> Union[list[str], str]:
     matching_groups = groupname_filter(
         groups=(await Newsgroup.all().values("id", "name")), pattern=wildmat
     )
-    group_ids: list[int] = [g["id"] for g in matching_groups]
-    articles: list[dict] = await Message.filter(
+    group_ids: List[int] = [g["id"] for g in matching_groups]
+    articles: List[dict] = await Message.filter(
         created_at__gte=gte_date, newsgroup__id__in=group_ids
     ).values("message_id")
 

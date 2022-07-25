@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from fnmatch import fnmatch
 from pathlib import Path
+from typing import List
 
 import toml
 
@@ -75,7 +76,7 @@ def get_num_lines(article: Message) -> int:
     return len(article.body.split("\n"))
 
 
-def groupname_filter(groups: list[dict], pattern: str) -> filter:
+def groupname_filter(groups: List[dict], pattern: str) -> filter:
     """
     A very incomplete wildmat implementation.
 

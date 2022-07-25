@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, List
 
 from models import Message
 from status_codes import StatusCodes
@@ -47,7 +47,7 @@ def get_header(art: Message, field_name: str) -> str:
         return ""
 
 
-async def do_hdr(server_state: "AsyncTCPServer") -> Union[list[str], str]:
+async def do_hdr(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
     8.5.1.  Usage
 
@@ -81,14 +81,14 @@ async def do_hdr(server_state: "AsyncTCPServer") -> Union[list[str], str]:
 
     """
 
-    tokens: list[str] = server_state.cmd_args
+    tokens: List[str] = server_state.cmd_args
     try:
         field_name: Optional[str] = tokens[0]
     except IndexError:
         return StatusCodes.ERR_CMDSYNTAXERROR
 
     identifier: Optional[str] = tokens[1] if len(tokens) > 1 else None
-    articles: list[Message] = []
+    articles: List[Message] = []
     status_str: str
     msg_id_provided: bool = False
 

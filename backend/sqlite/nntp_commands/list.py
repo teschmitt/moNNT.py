@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, List
 
 from tortoise.functions import Max, Min
 
@@ -51,7 +51,7 @@ extensions = (
 )
 
 
-async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
+async def do_list(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
     7.6.1.1.  Usage
 
@@ -87,8 +87,8 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
         |              |               | is advertised                      |
         +--------------+---------------+------------------------------------+
     """
-    tokens: list[str] = server_state.cmd_args
-    result_stats: list[str] = []
+    tokens: List[str] = server_state.cmd_args
+    result_stats: List[str] = []
     option: Optional[str] = tokens[0] if len(tokens) > 0 else None
 
     if len(tokens) > 2:
@@ -131,7 +131,7 @@ async def do_list(server_state: "AsyncTCPServer") -> Union[list[str], str]:
             pass
         elif option == "newsgroups":
             result_stats = [StatusCodes.STATUS_LISTNEWSGROUPS]
-            groups: Union[filter, list[dict]] = (
+            groups: Union[filter, List[dict]] = (
                 await Newsgroup.all().order_by("name").values("name", "description")
             )
             if len(tokens) == 2:

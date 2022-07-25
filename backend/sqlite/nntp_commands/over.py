@@ -55,8 +55,8 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
     selected_group: Optional[Newsgroup] = server_state.selected_group
     selected_article = server_state.selected_article
-    options: list[str] = server_state.cmd_args
-    article_list: list[Message] = []
+    options: List[str] = server_state.cmd_args
+    article_list: List[Message] = []
 
     if len(options) == 0 or options is None:
         if selected_group is None:
@@ -88,7 +88,7 @@ async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
             if len(article_list) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLENUM
 
-    headers: list[str] = []
+    headers: List[str] = []
     for msg in article_list:
         references: str = msg.references if msg.references is not None else ""
         headers.append(

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, List
 
 from backend.sqlite.nntp_commands.article import do_article
 from status_codes import StatusCodes
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from nntp_server import AsyncTCPServer
 
 
-async def do_head_body_stat(server_state: "AsyncTCPServer") -> Union[list[str], str]:
+async def do_head_body_stat(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
     6.2.2/3.2.  Description
 

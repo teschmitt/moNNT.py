@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, List
 
 from tortoise.functions import Count, Max, Min
 from tortoise.queryset import ValuesQuery
@@ -19,7 +19,7 @@ def get_group_stats(group_name: str) -> ValuesQuery:
     )
 
 
-async def do_listgroup(server_state: "AsyncTCPServer") -> Union[list[str], str]:
+async def do_listgroup(server_state: "AsyncTCPServer") -> Union[List[str], str]:
     """
     6.1.2.1.  Usage
 
@@ -44,11 +44,11 @@ async def do_listgroup(server_state: "AsyncTCPServer") -> Union[list[str], str]:
 
     """
 
-    tokens: list[str] = server_state.cmd_args
+    tokens: List[str] = server_state.cmd_args
     group_name: Optional[str] = tokens[0] if len(tokens) > 0 else None
     num_range: Optional[str] = tokens[1] if len(tokens) > 1 else None
-    result: list[str]
-    msgs: list[Message]
+    result: List[str]
+    msgs: List[Message]
     status_str: str
 
     if group_name is not None:
@@ -73,7 +73,7 @@ async def do_listgroup(server_state: "AsyncTCPServer") -> Union[list[str], str]:
             id__lte=parsed_range.stop,
         )
 
-    ids: list[int] = [msg.id for msg in msgs]
+    ids: List[int] = [msg.id for msg in msgs]
     if len(ids) > 0:
         status_str = StatusCodes.STATUS_LISTGROUP.substitute(
             number=len(msgs), low=min(ids), high=max(ids), group=server_state.selected_group.name
