@@ -5,7 +5,7 @@ from asyncio import AbstractEventLoop
 from collections import defaultdict
 from datetime import datetime
 from threading import Thread
-from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Union, List
+from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Union, List, Dict, DefaultDict
 
 import cbor2
 from cbor2 import CBORDecodeEOF
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 
 
 class DTN7Backend(Backend):
-    _call_dict: ClassVar[dict[str, Callable]] = {
+    _call_dict: ClassVar[Dict[str, Callable]] = {
         "article": article.do_article,
         "body": head_body_stat.do_head_body_stat,
         "capabilities": capabilities.do_capabilities,
@@ -245,7 +245,7 @@ class DTN7Backend(Backend):
 
     async def _async_save_article(self):
         self.logger.debug("Sending article to DTNd and local DTN message spool")
-        header: defaultdict[str] = defaultdict(str)
+        header: DefaultDict[str] = defaultdict(str)
         line: str = self.server.article_buffer.pop(0)
         field_name: str = ""
         field_value: str
@@ -415,7 +415,7 @@ class DTN7Backend(Backend):
                     )
                     self._rest_client.register(endpoint=f"dtn://{group_name}/~news")
 
-    def _ws_data_handler(self, ws_data: Union[str | bytes]) -> None:
+    def _ws_data_handler(self, ws_data: Union[str, bytes]) -> None:
         """
         This gets called when data gets sent over the WebSockets connection from remote.
         In cases where an article has been sent over to the DTNd, the DTNd will return a
@@ -427,7 +427,7 @@ class DTN7Backend(Backend):
         """
         self._loop.run_until_complete(self._async_ws_data_handler(ws_data))
 
-    async def _async_ws_data_handler(self, ws_data: Union[str | bytes]) -> None:
+    async def _async_ws_data_handler(self, ws_data: Union[str, bytes]) -> None:
         if isinstance(ws_data, str):
             self.logger.debug(
                 f"Received WebSocket data from DTNd, probably a status message: {ws_data}"

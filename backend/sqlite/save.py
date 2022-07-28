@@ -1,7 +1,7 @@
 import uuid
 from collections import defaultdict
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, DefaultDict
 
 from dateutil.parser import parse as date_parse
 
@@ -16,7 +16,7 @@ async def save_article(server_state: "AsyncTCPServer") -> None:
     # TODO: support cross posting to multiple newsgroups
     #       this entails setting up a M2M relationship between message and newsgroup
     #       https://kb.iu.edu/d/affn
-    header: defaultdict[str] = defaultdict(str)
+    header: DefaultDict[str] = defaultdict(str)
     line: str = server_state.article_buffer.pop(0)
     field_name: str = ""
     field_value: str
