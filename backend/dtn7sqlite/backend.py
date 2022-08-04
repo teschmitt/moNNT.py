@@ -5,7 +5,16 @@ from asyncio import AbstractEventLoop
 from collections import defaultdict
 from datetime import datetime
 from threading import Thread
-from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Union, List, Dict, DefaultDict
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    ClassVar,
+    DefaultDict,
+    Dict,
+    List,
+    Optional,
+    Union,
+)
 
 import cbor2
 from cbor2 import CBORDecodeEOF
