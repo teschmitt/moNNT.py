@@ -18,6 +18,7 @@ lifetime = 86400000
 deliv_notification = false
 
 [usenet]
+email = "t.e.schmitt@posteo.de"
 newsgroups = [
     "germany.hessen.darmstadt.darmstadt",
     "germany.hessen.darmstadt-dieburg.dieburg",
