@@ -204,9 +204,12 @@ class DTN7Backend(Backend):
         received_bundles: List[Bundle] = []
         if self._rest_client is not None:
             for group_name in self._group_names:
-                received_bundles.extend(
-                    self._rest_client.get_filtered_bundles(address_part_criteria=group_name)
-                )
+                try:
+                    received_bundles.extend(
+                        self._rest_client.get_filtered_bundles(address_part_criteria=group_name)
+                    )
+                except Exception as e: # noqa E722
+                    self.logger.warning(f"Error getting bundles from REST interface: {e}")
 
         for bundle in received_bundles:
             msg_id: str = (
@@ -265,7 +268,7 @@ class DTN7Backend(Backend):
                 elif len(field_name) > 0:
                     header[field_name] = f"{header[field_name]} {line}"
             except ValueError:
-                # something clients send fishy headers … we'll just ignore them.
+                # sometimes clients send fishy headers … we'll just ignore them.
                 pass
             line = self.server.article_buffer.pop(0)
 
@@ -310,6 +313,7 @@ class DTN7Backend(Backend):
             "lifetime": config["bundles"]["lifetime"],
         }
 
+        # HASHING
         message_hash = get_article_hash(
             source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
         )
@@ -417,11 +421,7 @@ class DTN7Backend(Backend):
                 retries += 1
             else:
                 # register all groups with the DTNd backend.
-                for group_name in self._group_names:
-                    self.logger.debug(
-                        f"Registering endpoint with REST client: dtn://{group_name}/~news"
-                    )
-                    self._rest_client.register(endpoint=f"dtn://{group_name}/~news")
+                await self._register_all_groups()
 
     def _ws_data_handler(self, ws_data: Union[str, bytes]) -> None:
         """
@@ -450,6 +450,7 @@ class DTN7Backend(Backend):
             self.logger.debug("Received WebSocket data from DTNd. Data determined to by bytes.")
             try:
                 ws_dict: dict = cbor2.loads(ws_data)
+                self.logger.debug(f"Data dict: {ws_dict}")
             except (CBORDecodeEOF, MemoryError) as e:
                 err: RuntimeError = RuntimeError(
                     "Something went wrong decoding a CBOR data object. Any intended save operation "
@@ -476,6 +477,7 @@ class DTN7Backend(Backend):
         self.logger.debug(f"      Sender: {ws_struct['src']} -> {sender}")
 
         group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
+        self.logger.debug(f"  Group Name: {ws_struct['dst']} -> {group_name}")
 
         bid_data: List[str] = ws_struct["bid"].split("-")
         src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
@@ -483,7 +485,10 @@ class DTN7Backend(Backend):
         ts_str: str = bid_data[-2]
 
         dt: datetime = from_dtn_timestamp(int(ts_str))
+        self.logger.debug(f"    Datetime: {ws_struct['bid']} -> {dt}")
+
         msg_id: str = f"<{ts_str}-{seq_str}@{src_like}.dtn>"
+        self.logger.debug(f"  Message ID: {ws_struct['bid']} -> {msg_id}")
 
         msg_data: dict = cbor2.loads(ws_struct["data"])
 
@@ -506,7 +511,7 @@ class DTN7Backend(Backend):
         )
         self.logger.debug(f"Created new entry with id {msg.id} in articles table")
 
-        # remove message from spool
+        # remove message from spool HASHING
         article_hash = get_article_hash(
             source=ws_struct["src"],
             destination=ws_struct["dst"],
