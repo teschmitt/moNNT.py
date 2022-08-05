@@ -214,10 +214,8 @@ class DTN7Backend(Backend):
                 f"{bundle.source.replace('dtn://', '').replace('//', '').replace('/', '-')}.dtn>"
             )
 
-            mail_domain, mail_name = (
-                bundle.source.replace("dtn://", "").replace("//", "").split("/mail/", maxsplit=1)
-            )
-            from_: str = f"{mail_name}@{mail_domain}"
+            # map BP7 to NNTP MAPPING
+            from_: str = self._bp7sender_to_nntpfrom(sender=bundle.source)
 
             group_name: str = (
                 bundle.destination.replace("dtn://", "").replace("//", "").replace("/~news", "")
@@ -302,10 +300,11 @@ class DTN7Backend(Backend):
         except AttributeError as e:
             self.logger.warning(f"Email address could ot be parsed: {e}")
             sender_email: str = "not-recognized@email-address.net"
-        name_email, domain_email = sender_email.split("@")
+        source: str = self._nntpfrom_to_bp7sender(from_=sender_email)
         # TODO: get lifetime, destination settings from settings:
         dtn_args: dict = {
-            "source": f"dtn://{domain_email}/mail/{name_email}",
+            # map NNTP to BP7 MAPPING
+            "source": source,
             "destination": f"dtn://{group_name}/~news",
             "delivery_notification": config["bundles"]["deliv_notification"],
             "lifetime": config["bundles"]["lifetime"],
@@ -472,9 +471,9 @@ class DTN7Backend(Backend):
     async def _handle_sent_article(self, ws_struct: dict):
         self.logger.debug("Mapping BP7 to NNTP fields")
 
-        # map BP7 to NNTP fields
-        sender_data: List[str] = ws_struct["src"].replace("dtn://", "").replace("//", "").split("/")
-        sender: str = f"{sender_data[-1]}@{sender_data[0]}"
+        # map BP7 to NNTP fields MAPPING
+        sender: str = self._bp7sender_to_nntpfrom(ws_struct["src"])
+        self.logger.debug(f"      Sender: {ws_struct['src']} -> {sender}")
 
         group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
 
@@ -522,6 +521,20 @@ class DTN7Backend(Backend):
                 f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead"
                 " of 1"
             )
+
+    def _bp7sender_to_nntpfrom(self, sender: str) -> str:
+        if not sender.startswith("//") and not sender.startswith("dtn://"):
+            raise ValueError(f"'{sender}' does not seem to be a valid DTN identifier")
+        sender_data: List[str] = sender.replace("dtn://", "").replace("//", "").split("/")
+        return f"{sender_data[-1]}@{sender_data[-2]}"
+
+    def _nntpfrom_to_bp7sender(self, from_: str) -> str:
+        if "@" not in from_:
+            raise ValueError(f"'{from_}' does not seem to be a valid email address")
+        node_id: str = self._rest_client.node_id
+        email_name, email_domain = from_.rsplit(sep="@", maxsplit=1)
+        # note: node id gets returned as string with trailing backslash: dtn://<NODEID>/
+        return f"{node_id}mail/{email_domain}/{email_name}"
 
     @property
     def available_commands(self) -> List[str]:
