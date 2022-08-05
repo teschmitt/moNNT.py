@@ -5,21 +5,6 @@ from models.newsgroup import Newsgroup
 
 
 class Message(Model):
-    # create table if not exists group_table_name
-    # (
-    #     id           bigint auto_increment
-    #         primary key,
-    #     `from`       text     not null,
-    #     `references` text     null,
-    #     message_id   text     not null,
-    #     thread_id    bigint   null,
-    #     parent_id    bigint   null,
-    #     subject      text     not null,
-    #     body         longtext not null,
-    #     created_at   datetime not null,
-    #     updated_at   datetime not null
-    # )
-
     id = fields.BigIntField(pk=True)
 
     # mandatory headers
