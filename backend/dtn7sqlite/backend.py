@@ -193,6 +193,13 @@ class DTN7Backend(Backend):
             self.logger.debug(f"Registering endpoint with REST client: dtn://{group_name}/~news")
             self._rest_client.register(endpoint=f"dtn://{group_name}/~news")
 
+        # also register the email address of sender, so we get info on sent
+        # articles through WebSocket back channel
+        sender_endpoint: str = self._nntpfrom_to_bp7sender(config["usenet"]["email"])
+        self.logger.debug(f"Registering WS back-channel: {sender_endpoint}")
+        self._rest_client.register(endpoint=sender_endpoint)
+
+
     async def _ingest_all_from_dtnd(self) -> None:
         self.logger.debug("Ingesting all newsgroup bundles in DTNd bundle store.")
         self.logger.debug(f"Found {len(self._group_names)} active newsgroups on this server.")
