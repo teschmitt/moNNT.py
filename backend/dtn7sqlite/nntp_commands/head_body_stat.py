@@ -4,10 +4,10 @@ from backend.dtn7sqlite.nntp_commands.article import do_article
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
-async def do_head_body_stat(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
+async def do_head_body_stat(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
     6.2.2/3.2.  Description
 
@@ -26,7 +26,7 @@ async def do_head_body_stat(server_state: "AsyncNNTPServer") -> Union[List[str],
         NOT multi-line.
     """
 
-    res = await do_article(server_state)
+    res = await do_article(client_conn)
 
     # pipe through any errors:
     status, num, msg_id, _ = res[0].split(" ", 3)
@@ -36,10 +36,10 @@ async def do_head_body_stat(server_state: "AsyncNNTPServer") -> Union[List[str],
     last_header_line: int = 0
     while res[last_header_line] != "":
         last_header_line += 1
-    if server_state.command == "head":
+    if client_conn.command == "head":
         res[0] = StatusCodes.STATUS_HEAD.substitute(number=num, message_id=msg_id)
         res = res[:last_header_line]
-    if server_state.command == "stat":
+    if client_conn.command == "stat":
         res = StatusCodes.STATUS_STAT.substitute(number=num, message_id=msg_id)
     else:
         last_header_line += 1

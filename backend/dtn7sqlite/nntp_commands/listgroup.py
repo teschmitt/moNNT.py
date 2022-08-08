@@ -8,7 +8,7 @@ from status_codes import StatusCodes
 from utils import ParsedRange, RangeParseStatus
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
 def get_group_stats(group_name: str) -> ValuesQuery:
@@ -19,7 +19,7 @@ def get_group_stats(group_name: str) -> ValuesQuery:
     )
 
 
-async def do_listgroup(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
+async def do_listgroup(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
     6.1.2.1.  Usage
 
@@ -44,7 +44,7 @@ async def do_listgroup(server_state: "AsyncNNTPServer") -> Union[List[str], str]
 
     """
 
-    tokens: List[str] = server_state.cmd_args
+    tokens: List[str] = client_conn.cmd_args
     group_name: Optional[str] = tokens[0] if len(tokens) > 0 else None
     num_range: Optional[str] = tokens[1] if len(tokens) > 1 else None
     result: List[str]
@@ -56,19 +56,19 @@ async def do_listgroup(server_state: "AsyncNNTPServer") -> Union[List[str], str]
         new_group: Newsgroup = await Newsgroup.get_or_none(name=group_name)
         if new_group is None:
             return StatusCodes.ERR_NOSUCHGROUP
-        server_state.selected_group = new_group
+        client_conn.selected_group = new_group
 
-    if server_state.selected_group is None:
+    if client_conn.selected_group is None:
         return StatusCodes.ERR_NOGROUPSELECTED
 
     if num_range is None:
-        msgs = await Message.filter(newsgroup__name=server_state.selected_group.name)
+        msgs = await Message.filter(newsgroup__name=client_conn.selected_group.name)
     else:
         parsed_range: ParsedRange = ParsedRange(range_str=num_range, max_value=2**63)
         if parsed_range.parse_status == RangeParseStatus.FAILURE:
             return StatusCodes.ERR_NOTPERFORMED
         msgs = await Message.filter(
-            newsgroup__name=server_state.selected_group.name,
+            newsgroup__name=client_conn.selected_group.name,
             id__gte=parsed_range.start,
             id__lte=parsed_range.stop,
         )
@@ -76,12 +76,12 @@ async def do_listgroup(server_state: "AsyncNNTPServer") -> Union[List[str], str]
     ids: List[int] = [msg.id for msg in msgs]
     if len(ids) > 0:
         status_str = StatusCodes.STATUS_LISTGROUP.substitute(
-            number=len(msgs), low=min(ids), high=max(ids), group=server_state.selected_group.name
+            number=len(msgs), low=min(ids), high=max(ids), group=client_conn.selected_group.name
         )
         result = [status_str] + list(map(str, ids))
     else:
         status_str = StatusCodes.STATUS_LISTGROUP.substitute(
-            number=len(msgs), low=0, high=0, group=server_state.selected_group.name
+            number=len(msgs), low=0, high=0, group=client_conn.selected_group.name
         )
         result = [status_str]
 

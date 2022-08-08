@@ -5,10 +5,10 @@ from settings import settings
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
-async def do_post(server_state: "AsyncNNTPServer") -> str:
+async def do_post(client_conn: "ClientConnection") -> str:
     """
     6.3.1.1.  Usage
 
@@ -34,5 +34,5 @@ async def do_post(server_state: "AsyncNNTPServer") -> str:
         return StatusCodes.STATUS_READONLYSERVER
 
     logger.debug("switching to post mode")
-    server_state.post_mode = True
+    client_conn.post_mode = True
     return StatusCodes.STATUS_SENDARTICLE

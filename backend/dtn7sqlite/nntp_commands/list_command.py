@@ -8,7 +8,7 @@ from status_codes import StatusCodes
 from utils import groupname_filter
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 logger = global_logger()
 
@@ -51,7 +51,7 @@ extensions = (
 )
 
 
-async def do_list(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
+async def do_list(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
     7.6.1.1.  Usage
 
@@ -87,7 +87,7 @@ async def do_list(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
         |              |               | is advertised                      |
         +--------------+---------------+------------------------------------+
     """
-    tokens: List[str] = server_state.cmd_args
+    tokens: List[str] = client_conn.cmd_args
     result_stats: List[str] = []
     option: Optional[str] = tokens[0] if len(tokens) > 0 else None
 

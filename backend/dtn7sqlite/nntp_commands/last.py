@@ -4,10 +4,10 @@ from models import Message, Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
-async def do_last(server_state: "AsyncNNTPServer") -> str:
+async def do_last(client_conn: "ClientConnection") -> str:
     """
     6.1.3.1.  Usage
 
@@ -27,8 +27,8 @@ async def do_last(server_state: "AsyncNNTPServer") -> str:
             message-id    Article message-id
     """
 
-    selected_group: Newsgroup = server_state.selected_group
-    selected_article: Message = server_state.selected_article
+    selected_group: Newsgroup = client_conn.selected_group
+    selected_article: Message = client_conn.selected_article
     if selected_group is None:
         return StatusCodes.ERR_NOGROUPSELECTED
     if selected_article is None:
@@ -43,6 +43,6 @@ async def do_last(server_state: "AsyncNNTPServer") -> str:
     if msg is None:
         return StatusCodes.ERR_NOPREVIOUSARTICLE
 
-    server_state.selected_article = msg
+    client_conn.selected_article = msg
 
     return StatusCodes.STATUS_NEXTLAST.substitute(number=msg.id, message_id=msg.message_id)

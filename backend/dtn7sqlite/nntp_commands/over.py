@@ -13,7 +13,7 @@ from utils import (
 )
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
 def get_messages(group: Newsgroup, start: int, stop: int) -> QuerySet[Message]:
@@ -22,7 +22,7 @@ def get_messages(group: Newsgroup, start: int, stop: int) -> QuerySet[Message]:
     )
 
 
-async def do_over(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
+async def do_over(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
     8.3.1.  Usage
 
@@ -53,9 +53,9 @@ async def do_over(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
             range         Number(s) of articles
             message-id    Message-id of article
     """
-    selected_group: Optional[Newsgroup] = server_state.selected_group
-    selected_article = server_state.selected_article
-    options: List[str] = server_state.cmd_args
+    selected_group: Optional[Newsgroup] = client_conn.selected_group
+    selected_article = client_conn.selected_article
+    options: List[str] = client_conn.cmd_args
     article_list: List[Message] = []
 
     if len(options) == 0 or options is None:
@@ -72,7 +72,7 @@ async def do_over(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
             if len(article_list) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLE
         else:
-            if server_state.selected_group is None:
+            if client_conn.selected_group is None:
                 return StatusCodes.ERR_NOGROUPSELECTED
 
             parsed_range: ParsedRange = ParsedRange(range_str=arg, max_value=2**63)

@@ -8,7 +8,7 @@ from status_codes import StatusCodes
 from utils import build_xref
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
 def get_messages_by_num(num: int, group: Newsgroup) -> QuerySetSingle[Message]:
@@ -19,7 +19,7 @@ def get_messages_by_msg_id(message_id: str) -> QuerySetSingle[Message]:
     return Message.get_or_none(message_id=message_id)
 
 
-async def do_article(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
+async def do_article(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
     6.2.1.1.  Usage
 
@@ -54,8 +54,8 @@ async def do_article(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     article_info: list
     response_status: str
 
-    identifier: Optional[str] = server_state.cmd_args[0] if len(server_state.cmd_args) > 0 else None
-    selected_group: Optional[Newsgroup] = server_state.selected_group
+    identifier: Optional[str] = client_conn.cmd_args[0] if len(client_conn.cmd_args) > 0 else None
+    selected_group: Optional[Newsgroup] = client_conn.selected_group
 
     # figure out how the article is supposed to be identified
     id_provided: bool = identifier is not None and "<" in identifier and ">" in identifier
@@ -77,12 +77,12 @@ async def do_article(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
         msg: Message = await get_messages_by_num(num, selected_group)
     else:
         # third form
-        msg: Message = server_state.selected_article
+        msg: Message = client_conn.selected_article
 
     if msg is None:
         return StatusCodes.ERR_NOSUCHARTICLE
 
-    server_state.selected_article = msg
+    client_conn.selected_article = msg
 
     try:
         response_status = StatusCodes.STATUS_ARTICLE % (

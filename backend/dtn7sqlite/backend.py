@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 
 
 class DTN7Backend(Backend):
-    _call_dict: ClassVar[Dict[str, Callable]] = {
+    call_dict: ClassVar[Dict[str, Callable]] = {
         "article": article.do_article,
         "body": head_body_stat.do_head_body_stat,
         "capabilities": capabilities.do_capabilities,
@@ -102,9 +102,6 @@ class DTN7Backend(Backend):
         self._rest_client = None
         self._ws_client = None
         self._ws_runner = None
-
-    def call_command(self, nntp_command):
-        return self._loop.run_until_complete(self._call_dict[nntp_command](self.server))
 
     def stop(self) -> None:
         self.logger.info("Stopping DTN7Backend")
@@ -269,17 +266,17 @@ class DTN7Backend(Backend):
             else:
                 self.logger.debug(f"Article {msg_id} already present in newsgroup '{group.name}'.")
 
-    def save_article(self) -> None:
+    def save_article(self, article_buffer: List[str]) -> None:
         # TODO: support cross posting to multiple newsgroups
         #       this entails setting up a M2M relationship between message and newsgroup
         #       https://kb.iu.edu/d/affn
 
-        self._loop.run_until_complete(self._async_save_article())
+        self._loop.run_until_complete(self._async_save_article(article_buffer=article_buffer))
 
-    async def _async_save_article(self):
+    async def _async_save_article(self, article_buffer: List[str]):
         self.logger.debug("Sending article to DTNd and local DTN message spool")
         header: DefaultDict[str] = defaultdict(str)
-        line: str = self.server.article_buffer.pop(0)
+        line: str = article_buffer.pop(0)
         field_name: str = ""
         field_value: str
         while len(line) != 0:
@@ -293,13 +290,13 @@ class DTN7Backend(Backend):
             except ValueError:
                 # sometimes clients send fishy headers … we'll just ignore them.
                 pass
-            line = self.server.article_buffer.pop(0)
+            line = article_buffer.pop(0)
 
         article_group = await Newsgroup.get_or_none(name=header["newsgroups"])
         # TODO: Error handling when newsgroup is not in DB
 
         # we've popped off the complete header, body is just the joined rest
-        body: str = "\n".join(self.server.article_buffer)
+        body: str = "\n".join(article_buffer)
         # dt: datetime = date_parse(
         #   header["date"]) if len(header["date"]) > 0 else datetime.utcnow()
 
@@ -321,6 +318,7 @@ class DTN7Backend(Backend):
             # "user_agent": header["user-agent"],
         }
 
+        # TODO use sender email defined in config
         try:
             sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
         except AttributeError as e:
@@ -566,4 +564,4 @@ class DTN7Backend(Backend):
 
     @property
     def available_commands(self) -> List[str]:
-        return list(self._call_dict.keys())
+        return list(self.call_dict.keys())
