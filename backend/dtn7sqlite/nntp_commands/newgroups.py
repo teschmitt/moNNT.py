@@ -7,10 +7,10 @@ from status_codes import StatusCodes
 from utils import get_datetime
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
-async def do_newgroups(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
+async def do_newgroups(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
     7.3.1.  Usage
 
@@ -26,7 +26,7 @@ async def do_newgroups(server_state: "AsyncNNTPServer") -> Union[List[str], str]
             date    Date in yymmdd or yyyymmdd format
             time    Time in hhmmss format
     """
-    tokens: List[str] = server_state.cmd_args
+    tokens: List[str] = client_conn.cmd_args
     if len(tokens) > 3 or (len(tokens) == 3 and tokens[2] != "gmt"):
         # invalid command, return an error-code
         return StatusCodes.ERR_CMDSYNTAXERROR

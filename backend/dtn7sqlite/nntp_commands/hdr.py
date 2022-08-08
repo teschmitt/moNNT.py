@@ -11,7 +11,7 @@ from utils import (
 )
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
 async def augment_article(art: Message) -> Message:
@@ -47,7 +47,7 @@ def get_header(art: Message, field_name: str) -> str:
         return ""
 
 
-async def do_hdr(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
+async def do_hdr(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
     8.5.1.  Usage
 
@@ -81,7 +81,7 @@ async def do_hdr(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
 
     """
 
-    tokens: List[str] = server_state.cmd_args
+    tokens: List[str] = client_conn.cmd_args
     try:
         field_name: Optional[str] = tokens[0]
     except IndexError:
@@ -94,14 +94,14 @@ async def do_hdr(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
 
     if identifier is not None:
         if "-" in identifier:
-            if server_state.selected_group is None:
+            if client_conn.selected_group is None:
                 return StatusCodes.ERR_NOGROUPSELECTED
 
             parsed_range: ParsedRange = ParsedRange(range_str=identifier, max_value=2**63)
             if parsed_range.parse_status == RangeParseStatus.FAILURE:
                 return StatusCodes.ERR_NOTPERFORMED
             articles = await Message.filter(
-                newsgroup__name=server_state.selected_group.name,
+                newsgroup__name=client_conn.selected_group.name,
                 id__gte=parsed_range.start,
                 id__lte=parsed_range.stop,
             ).prefetch_related("newsgroup")
@@ -116,12 +116,12 @@ async def do_hdr(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
             if len(articles) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLE
     else:
-        if server_state.selected_group is None:
+        if client_conn.selected_group is None:
             return StatusCodes.ERR_NOGROUPSELECTED
-        if server_state.selected_article is None:
+        if client_conn.selected_article is None:
             return StatusCodes.ERR_NOARTICLESELECTED
-        await server_state.selected_article.fetch_related("newsgroup")
-        articles = [server_state.selected_article]
+        await client_conn.selected_article.fetch_related("newsgroup")
+        articles = [client_conn.selected_article]
 
     return [StatusCodes.STATUS_HEADERS_FOLLOW] + [
         f"{0 if msg_id_provided else art.id} {get_header(art, field_name)}" for art in articles

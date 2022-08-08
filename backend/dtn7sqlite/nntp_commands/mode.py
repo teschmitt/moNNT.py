@@ -5,10 +5,10 @@ from settings import settings
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
-async def do_mode(server_state: "AsyncNNTPServer") -> str:
+async def do_mode(client_conn: "ClientConnection") -> str:
     """
     Syntax:
         MODE READER|STREAM
@@ -18,7 +18,7 @@ async def do_mode(server_state: "AsyncNNTPServer") -> str:
         203 Streaming is OK
         500 Command not understood
     """
-    tokens: List[str] = server_state.cmd_args
+    tokens: List[str] = client_conn.cmd_args
     logger.debug(f"in do_mode with {tokens}")
     if tokens[0] == "reader":
         if settings.SERVER_TYPE == "read-only":

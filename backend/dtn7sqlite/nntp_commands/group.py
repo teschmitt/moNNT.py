@@ -6,10 +6,10 @@ from models import Message, Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncNNTPServer
+    from client_connection import ClientConnection
 
 
-async def do_group(server_state: "AsyncNNTPServer") -> str:
+async def do_group(client_conn: "ClientConnection") -> str:
     """
     Syntax:
         GROUP ggg
@@ -22,7 +22,7 @@ async def do_group(server_state: "AsyncNNTPServer") -> str:
         411 no such news group
     """
 
-    tokens: List[str] = server_state.cmd_args
+    tokens: List[str] = client_conn.cmd_args
 
     if len(tokens) != 1:
         return StatusCodes.ERR_CMDSYNTAXERROR
@@ -30,15 +30,15 @@ async def do_group(server_state: "AsyncNNTPServer") -> str:
     new_group: Optional[Newsgroup] = await Newsgroup.get_or_none(name=tokens[0])
     if new_group is None:
         return StatusCodes.ERR_NOSUCHGROUP
-    server_state.selected_group = new_group
+    client_conn.selected_group = new_group
     # if the selected group is empty, filter.first() will return None so this is RFC-compliant:
-    server_state.selected_article = (
-        await Message.filter(newsgroup=server_state.selected_group).order_by("id").first()
+    client_conn.selected_article = (
+        await Message.filter(newsgroup=client_conn.selected_group).order_by("id").first()
     )
     group_stats: Optional[dict] = (
         await Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
         .group_by("newsgroup__id")
-        .filter(newsgroup=server_state.selected_group)
+        .filter(newsgroup=client_conn.selected_group)
         .first()
         .values(name="newsgroup__name", count="count", min="min", max="max")
     )
@@ -49,7 +49,7 @@ async def do_group(server_state: "AsyncNNTPServer") -> str:
             count=0,
             first=0,
             last=0,
-            name=server_state.selected_group.name,
+            name=client_conn.selected_group.name,
         )
 
     return StatusCodes.STATUS_GROUPSELECTED.substitute(

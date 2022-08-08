@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from logger import global_logger
 
@@ -21,11 +21,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def call_command(self, nntp_command):
-        pass
-
-    @abstractmethod
-    def save_article(self):
+    def save_article(self, article_buffer: List[str]):
         pass
 
     @abstractmethod
