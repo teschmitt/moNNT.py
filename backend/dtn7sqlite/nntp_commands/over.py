@@ -13,7 +13,7 @@ from utils import (
 )
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
 def get_messages(group: Newsgroup, start: int, stop: int) -> QuerySet[Message]:
@@ -22,7 +22,7 @@ def get_messages(group: Newsgroup, start: int, stop: int) -> QuerySet[Message]:
     )
 
 
-async def do_over(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+async def do_over(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     """
     8.3.1.  Usage
 

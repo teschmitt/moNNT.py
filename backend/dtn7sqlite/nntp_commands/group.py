@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, List, Optional
 
 from tortoise.functions import Count, Max, Min
 
@@ -6,10 +6,10 @@ from models import Message, Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
-async def do_group(server_state: "AsyncTCPServer") -> str:
+async def do_group(server_state: "AsyncNNTPServer") -> str:
     """
     Syntax:
         GROUP ggg

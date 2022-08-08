@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Union, List
+from typing import TYPE_CHECKING, List, Optional, Union
 
 from models import Message
 from status_codes import StatusCodes
@@ -11,7 +11,7 @@ from utils import (
 )
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
 async def augment_article(art: Message) -> Message:
@@ -47,7 +47,7 @@ def get_header(art: Message, field_name: str) -> str:
         return ""
 
 
-async def do_hdr(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+async def do_hdr(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     """
     8.5.1.  Usage
 

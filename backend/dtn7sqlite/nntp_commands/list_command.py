@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Union, List
+from typing import TYPE_CHECKING, List, Optional, Union
 
 from tortoise.functions import Max, Min
 
@@ -8,7 +8,7 @@ from status_codes import StatusCodes
 from utils import groupname_filter
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 logger = global_logger()
 
@@ -51,7 +51,7 @@ extensions = (
 )
 
 
-async def do_list(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+async def do_list(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     """
     7.6.1.1.  Usage
 

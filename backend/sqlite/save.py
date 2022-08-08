@@ -9,10 +9,10 @@ from models import Message, Newsgroup
 from settings import settings
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
-async def save_article(server_state: "AsyncTCPServer") -> None:
+async def save_article(server_state: "AsyncNNTPServer") -> None:
     # TODO: support cross posting to multiple newsgroups
     #       this entails setting up a M2M relationship between message and newsgroup
     #       https://kb.iu.edu/d/affn

@@ -50,7 +50,7 @@ from models import DTNMessage, Message, Newsgroup
 from settings import settings
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
 class DTN7Backend(Backend):
@@ -85,7 +85,7 @@ class DTN7Backend(Backend):
     _ws_runner: Optional[Thread]
     _loop: AbstractEventLoop
 
-    def __init__(self, server: "AsyncTCPServer"):
+    def __init__(self, server: "AsyncNNTPServer"):
         super().__init__(server)
 
         # Connect to db

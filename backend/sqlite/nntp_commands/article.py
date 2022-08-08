@@ -8,7 +8,7 @@ from status_codes import StatusCodes
 from utils import build_xref
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
 def get_messages_by_num(num: int, group: Newsgroup) -> QuerySetSingle[Message]:
@@ -19,7 +19,7 @@ def get_messages_by_msg_id(message_id: str) -> QuerySetSingle[Message]:
     return Message.get_or_none(message_id=message_id)
 
 
-async def do_article(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+async def do_article(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     """
     6.2.1.1.  Usage
 

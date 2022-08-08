@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING
 from logger import global_logger
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
 class Backend(ABC):
     logger: Logger
-    server: "AsyncTCPServer"
+    server: "AsyncNNTPServer"
 
-    def __init__(self, server: "AsyncTCPServer"):
+    def __init__(self, server: "AsyncNNTPServer"):
         self.logger = global_logger()
         self.server = server
 

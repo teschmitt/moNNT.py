@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Union, List
+from typing import TYPE_CHECKING, List, Optional, Union
 
 from tortoise.functions import Count, Max, Min
 from tortoise.queryset import ValuesQuery
@@ -8,7 +8,7 @@ from status_codes import StatusCodes
 from utils import ParsedRange, RangeParseStatus
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
 def get_group_stats(group_name: str) -> ValuesQuery:
@@ -19,7 +19,7 @@ def get_group_stats(group_name: str) -> ValuesQuery:
     )
 
 
-async def do_listgroup(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+async def do_listgroup(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     """
     6.1.2.1.  Usage
 

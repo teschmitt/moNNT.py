@@ -1,14 +1,14 @@
-from typing import TYPE_CHECKING, Union, List
+from typing import TYPE_CHECKING, List, Union
 
 from models import Message, Newsgroup
 from status_codes import StatusCodes
 from utils import get_datetime, groupname_filter
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
-async def do_newnews(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+async def do_newnews(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     """
     7.4.1.  Usage
 

@@ -18,7 +18,7 @@ class NNTPServer(ForkingTCPServer):
         max_children = settings.MAX_CONNECTIONS
 
 
-class AsyncTCPServer:
+class AsyncNNTPServer:
     def __init__(self, hostname: str, port: int) -> None:
         self.hostname: str = hostname
         self.port: int = port

@@ -4,10 +4,10 @@ from models import Message, Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
-async def do_next(server_state: "AsyncTCPServer") -> str:
+async def do_next(server_state: "AsyncNNTPServer") -> str:
     """
     6.1.4.1.  Usage
 

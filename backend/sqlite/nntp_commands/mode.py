@@ -5,10 +5,10 @@ from settings import settings
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
-async def do_mode(server_state: "AsyncTCPServer") -> str:
+async def do_mode(server_state: "AsyncNNTPServer") -> str:
     """
     Syntax:
         MODE READER|STREAM

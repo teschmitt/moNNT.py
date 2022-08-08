@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Union, List
+from typing import TYPE_CHECKING, List, Union
 
 from tortoise.functions import Max, Min
 
@@ -7,10 +7,10 @@ from status_codes import StatusCodes
 from utils import get_datetime
 
 if TYPE_CHECKING:
-    from nntp_server import AsyncTCPServer
+    from nntp_server import AsyncNNTPServer
 
 
-async def do_newgroups(server_state: "AsyncTCPServer") -> Union[List[str], str]:
+async def do_newgroups(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     """
     7.3.1.  Usage
 
