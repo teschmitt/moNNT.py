@@ -20,6 +20,7 @@ deliv_notification = false
 [usenet]
 email = "t.e.schmitt@posteo.de"
 newsgroups = [
+    "eval.core.monntpy",
     "germany.hessen.darmstadt.darmstadt",
     "germany.hessen.darmstadt-dieburg.dieburg",
     "germany.hessen.darmstadt-dieburg.rossdorf"

@@ -13,6 +13,7 @@ from typing import (
     Dict,
     List,
     Optional,
+    Set,
     Union,
 )
 
@@ -117,6 +118,22 @@ class DTN7Backend(Backend):
         :return: None
         """
         self._group_names: List[str] = await get_all_newsgroups()
+
+        # config.toml is single source of truth, so:
+        # add all newsgroups that are in config.toml but not in db,
+        # delete all in db and not in config
+        self.logger.info("Reconciling newsgroup configuration with database")
+        add_groups: Set[str] = set(config["usenet"]["newsgroups"]) - set(self._group_names)
+        del_groups: Set[str] = set(self._group_names) - set(config["usenet"]["newsgroups"])
+        for gn in add_groups:
+            self.logger.info(f" -> Adding new group '{gn}'")
+            await Newsgroup.create(name=gn)
+            self._group_names.append(gn)
+        for gn in del_groups:
+            self.logger.info(f" -> Removing group '{gn}'")
+            await Newsgroup.filter(name=gn).delete()
+            self._group_names.remove(gn)
+
         await self._rest_connector()
         await self._start_ws_client()
 
@@ -199,7 +216,6 @@ class DTN7Backend(Backend):
         self.logger.debug(f"Registering WS back-channel: {sender_endpoint}")
         self._rest_client.register(endpoint=sender_endpoint)
 
-
     async def _ingest_all_from_dtnd(self) -> None:
         self.logger.debug("Ingesting all newsgroup bundles in DTNd bundle store.")
         self.logger.debug(f"Found {len(self._group_names)} active newsgroups on this server.")
@@ -215,9 +231,9 @@ class DTN7Backend(Backend):
                     received_bundles.extend(
                         self._rest_client.get_filtered_bundles(address_part_criteria=group_name)
                     )
-                except Exception as e: # noqa E722
+                except Exception as e:  # noqa E722
                     self.logger.warning(f"Error getting bundles from REST interface: {e}")
-
+                    self.logger.exception(e)
         for bundle in received_bundles:
             msg_id: str = (
                 f"<{bundle.timestamp}-{bundle.sequence_number}@"
