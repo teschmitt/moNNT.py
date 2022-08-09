@@ -15,10 +15,9 @@ RUN mkdir -p /app
 COPY . /app
 WORKDIR /app
 
-RUN poetry install --no-interaction --no-ansi --no-root --no-dev
-
-
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --no-root --no-dev
 
 EXPOSE 1190
 
-ENTRYPOINT ["entrypoint.sh", "florentin", "mtcp"]
+ENTRYPOINT "entrypoint.sh"
