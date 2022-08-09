@@ -221,6 +221,7 @@ class DTN7Backend(Backend):
             self.logger.debug("Waiting for REST client to come online")
             await asyncio.sleep(config["backoff"]["constant_wait"])
 
+        # TODO: get present bundle ids in dtnd, throw away known bids and filter out unsubbed groups
         received_bundles: List[Bundle] = []
         if self._rest_client is not None:
             for group_name in self._group_names:
@@ -330,7 +331,7 @@ class DTN7Backend(Backend):
             # map NNTP to BP7 MAPPING
             "source": source,
             "destination": f"dtn://{group_name}/~news",
-            "delivery_notification": config["bundles"]["deliv_notification"],
+            "delivery_notification": config["bundles"]["delivery_notification"],
             "lifetime": config["bundles"]["lifetime"],
         }
 

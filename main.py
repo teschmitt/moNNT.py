@@ -1,3 +1,5 @@
+#!/usr/bin/python3 -u
+
 import asyncio
 
 from backend.dtn7sqlite.backend import DTN7Backend

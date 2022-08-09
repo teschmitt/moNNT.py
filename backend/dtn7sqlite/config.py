@@ -19,5 +19,5 @@ except FileNotFoundError:
             "rest_path": "",
             "ws_path": "/ws",
         },
-        "bundles": {"lifetime": "86400000", "deliv_notification": "false"},
+        "bundles": {"lifetime": "86400000", "delivery_notification": "false"},
     }

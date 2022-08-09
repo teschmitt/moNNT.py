@@ -15,9 +15,10 @@ constant_wait = 0.75
 
 [bundles]
 lifetime = 86400000
-deliv_notification = false
+delivery_notification = false
 
 [usenet]
+expiry_time = 86400000   # ms make human readable
 email = "t.e.schmitt@posteo.de"
 newsgroups = [
     "eval.core.monntpy",

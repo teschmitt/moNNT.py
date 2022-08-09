@@ -107,9 +107,7 @@ class ClientConnection:
                 try:
                     self._server.send(
                         writer=self._writer,
-                        send_obj=await self._server.backend.call_dict[self._command](
-                            client_conn=self
-                        ),
+                        send_obj=await self._server.backend.call_dict[self._command](self),
                     )
                 except Exception as e:
                     self.logger.exception(e)
