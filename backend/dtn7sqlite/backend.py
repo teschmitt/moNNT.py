@@ -119,14 +119,14 @@ class DTN7Backend(Backend):
         # config.toml is single source of truth, so:
         # add all newsgroups that are in config.toml but not in db,
         # delete all in db and not in config
+        want_set: set = set(config["usenet"]["newsgroups"])
+        have_set: set = set(self._group_names)
         self.logger.info("Reconciling newsgroup configuration with database")
-        add_groups: Set[str] = set(config["usenet"]["newsgroups"]) - set(self._group_names)
-        del_groups: Set[str] = set(self._group_names) - set(config["usenet"]["newsgroups"])
-        for gn in add_groups:
+        for gn in want_set - have_set:
             self.logger.info(f" -> Adding new group '{gn}'")
             await Newsgroup.create(name=gn)
             self._group_names.append(gn)
-        for gn in del_groups:
+        for gn in have_set - want_set:
             self.logger.info(f" -> Removing group '{gn}'")
             await Newsgroup.filter(name=gn).delete()
             self._group_names.remove(gn)
