@@ -1,8 +1,9 @@
+[backend]
+db_url = "sqlite://db.sqlite3"
+
 [dtnd]
 host = "http://127.0.0.1"
 port = 3000
-
-node_id = ""
 rest_path = ""
 ws_path = "/ws"
 multi_user = false

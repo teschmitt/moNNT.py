@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, List
 
 from backend.sqlite.nntp_commands import logger
-from settings import settings
+from config import server_config
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ async def do_mode(server_state: "AsyncNNTPServer") -> str:
     tokens: List[str] = server_state.cmd_args
     logger.debug(f"in do_mode with {tokens}")
     if tokens[0] == "reader":
-        if settings.SERVER_TYPE == "read-only":
+        if server_config["server_type"] == "read-only":
             return StatusCodes.STATUS_NOPOSTMODE
         else:
             return StatusCodes.STATUS_POSTALLOWED

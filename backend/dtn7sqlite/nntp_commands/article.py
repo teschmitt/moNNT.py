@@ -2,8 +2,8 @@ from typing import TYPE_CHECKING, List, Optional, Union
 
 from tortoise.queryset import QuerySetSingle
 
+from config import server_config
 from models import Message, Newsgroup
-from settings import settings
 from status_codes import StatusCodes
 from utils import build_xref
 
@@ -94,7 +94,7 @@ async def do_article(client_conn: "ClientConnection") -> Union[List[str], str]:
 
     result = [
         response_status,
-        f"Path: {settings.DOMAIN_NAME}",
+        f"Path: {server_config['domain_name']}",
         f"From: {msg.from_}",
         f"Newsgroups: {selected_group.name}",
         f"Date: {msg.created_at.strftime('%a, %d %b %Y %H:%M:%S %Z')}",

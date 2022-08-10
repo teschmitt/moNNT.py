@@ -1,0 +1,18 @@
+domain_name = "planetzorg.net"
+
+# Path name used in the article header
+path_name="planetzorg"
+
+# Host name to bind to (will also be used in NNTP responses and headers)
+nntp_hostname="0.0.0.0"
+
+# Port to listen on
+nntp_port=1190
+
+# type of server ('read-only' or 'read-write')
+server_type="read-write"
+
+# maximum number of empty requests before closing a connection:
+# most of the time this happens when clients are closed and do
+# not issue a QUIT command
+max_empty_requests=10

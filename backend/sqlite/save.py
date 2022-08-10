@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, DefaultDict
 
 from dateutil.parser import parse as date_parse
 
+from config import server_config
 from models import Message, Newsgroup
-from settings import settings
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
@@ -49,9 +49,9 @@ async def save_article(server_state: "AsyncNNTPServer") -> None:
             from_=header["from"],
             subject=header["subject"],
             created_at=dt,
-            message_id=f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
+            message_id=f"<{uuid.uuid4()}@{server_config['domain_name']}>",
             body=body,
-            path=f"!{settings.DOMAIN_NAME}",
+            path=f"!{server_config['domain_name']}",
             references=header["references"],
             reply_to=header["reply-to"],
             organization=header["organization"],
@@ -67,9 +67,9 @@ async def save_article(server_state: "AsyncNNTPServer") -> None:
         "from": header["from"],
         "subject": header["subject"],
         "created_at": dt.isoformat(),
-        "message_id": f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
+        "message_id": f"<{uuid.uuid4()}@{server_config['domain_name']}>",
         "body": body,
-        "path": f"!{settings.DOMAIN_NAME}",
+        "path": f"!{server_config['domain_name']}",
         "references": header["references"],
         "reply_to": header["reply-to"],
         "organization": header["organization"],

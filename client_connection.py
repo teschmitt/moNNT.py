@@ -2,9 +2,9 @@ from asyncio import StreamReader, StreamWriter, wait_for
 from logging import Logger
 from typing import TYPE_CHECKING, List, Optional
 
+from config import server_config
 from logger import global_logger
 from models import Message, Newsgroup
-from settings import settings
 from status_codes import StatusCodes
 from utils import get_version
 
@@ -37,15 +37,17 @@ class ClientConnection:
         self._terminated = False
         self._empty_token_counter = 0
 
-        if settings.SERVER_TYPE == "read-only":
+        if server_config["server_type"] == "read-only":
             self._server.send(
                 writer=self._writer,
-                send_obj=StatusCodes.STATUS_READYNOPOST % (settings.NNTP_HOSTNAME, get_version()),
+                send_obj=StatusCodes.STATUS_READYNOPOST
+                % (server_config["nntp_hostname"], get_version()),
             )
         else:
             self._server.send(
                 writer=self._writer,
-                send_obj=StatusCodes.STATUS_READYOKPOST % (settings.NNTP_HOSTNAME, get_version()),
+                send_obj=StatusCodes.STATUS_READYOKPOST
+                % (server_config["nntp_hostname"], get_version()),
             )
 
         # main execution loop for handling a connection until it's closed
@@ -91,7 +93,7 @@ class ClientConnection:
 
             if all([t == "" for t in tokens]):
                 self._empty_token_counter += 1
-                if self._empty_token_counter >= settings.MAX_EMPTY_REQUESTS:
+                if self._empty_token_counter >= server_config["max_empty_requests"]:
                     self.logger.warning(
                         "WARNING: Noping out because client is sending too many empty requests"
                     )

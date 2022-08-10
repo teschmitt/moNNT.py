@@ -20,9 +20,16 @@ black = "^22.3.0"
 pre-commit = "^2.18.1"
 isort = "^5.10.1"
 
+# Settings for the moNNT.py NNTP server
+# For, "env", following settings are possible:
+#   - "dev": development environment, this will load config.dev.toml
+#   - "prod": production environment, this will load config.prod.toml
+#   - "test": testing environment, this will load config.test.toml
+[monntpy]
+env = "dev"
 
 [tool.aerich]
-tortoise_orm = "settings.TORTOISE_ORM"
+tortoise_orm = "backend.dtn7sqlite.config.TORTOISE_ORM"
 location = "./migrations"
 src_folder = "./."
 

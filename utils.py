@@ -1,5 +1,4 @@
 import os
-import re
 from datetime import datetime, timezone
 from enum import Enum
 from fnmatch import fnmatch
@@ -8,8 +7,8 @@ from typing import List
 
 import toml
 
+from config import server_config
 from models import Message
-from settings import settings
 
 
 class RangeParseStatus(Enum):
@@ -61,7 +60,7 @@ def get_version() -> str:
 
 
 def build_xref(article_id: int, group_name: str) -> str:
-    return f"{settings.DOMAIN_NAME} {group_name}:{article_id}"
+    return f"{server_config['domain_name']} {group_name}:{article_id}"
 
 
 def get_bytes_len(article: Message) -> int:

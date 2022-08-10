@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from backend.sqlite.nntp_commands import logger
-from settings import settings
+from config import server_config
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ async def do_post(server_state: "AsyncNNTPServer") -> str:
         441    Posting failed
     """
 
-    if settings.SERVER_TYPE != "read-write":
+    if server_config["server_type"] != "read-write":
         return StatusCodes.STATUS_READONLYSERVER
 
     logger.debug("switching to post mode")

@@ -13,7 +13,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Set,
     Union,
 )
 
@@ -47,7 +46,6 @@ from backend.dtn7sqlite.nntp_commands import (
 )
 from backend.dtn7sqlite.utils import get_article_hash
 from models import DTNMessage, Message, Newsgroup
-from settings import settings
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
@@ -310,9 +308,9 @@ class DTN7Backend(Backend):
             # "from": header["from"],
             "subject": header["subject"],
             # "created_at": dt.isoformat(),
-            # "message_id": f"<{uuid.uuid4()}@{settings.DOMAIN_NAME}>",
+            # "message_id": f"<{uuid.uuid4()}@{server_config['domain_name']}>",
             "body": body,
-            # "path": f"!{settings.DOMAIN_NAME}",
+            # "path": f"!{server_config['domain_name']}",
             "references": header["references"],
             "reply_to": header["reply-to"],
             # "organization": header["organization"],
@@ -351,8 +349,8 @@ class DTN7Backend(Backend):
         self.logger.debug(f"Done sending message {dtn_msg.id} to dtnd")
 
     async def _init_db(self) -> None:
-        await Tortoise.init(db_url=settings.DB_URL, modules={"models": ["models"]})
-        self.logger.info(f"Connected to database {settings.DB_URL}")
+        await Tortoise.init(db_url=config["backend"]["db_url"], modules={"models": ["models"]})
+        self.logger.info(f"Connected to database {config['backend']['db_url']}")
 
     def _ws_connector(self) -> None:
         """
