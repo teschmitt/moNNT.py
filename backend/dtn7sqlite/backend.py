@@ -350,6 +350,9 @@ class DTN7Backend(Backend):
 
     async def _init_db(self) -> None:
         await Tortoise.init(db_url=config["backend"]["db_url"], modules={"models": ["models"]})
+        # generate schema only if table does not exist yet
+        await Tortoise.generate_schemas(safe=True)
+
         self.logger.info(f"Connected to database {config['backend']['db_url']}")
 
     def _ws_connector(self) -> None:

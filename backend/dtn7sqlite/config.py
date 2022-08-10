@@ -30,23 +30,11 @@ except FileNotFoundError:
         "bundles": {"lifetime": 86400000, "delivery_notification": False},
         "usenet": {
             "expiry_time": 86400000,
-            "email": "t.e.schmitt@posteo.de",
+            "email": "none@none.com",
             "newsgroups": [
-                "eval.core.monntpy",
-                "monntpy.usersgermany.hessen.darmstadt.darmstadt",
-                "germany.hessen.darmstadt-dieburg.dieburg",
-                "germany.hessen.darmstadt-dieburg.rossdorf",
+                "monntpy.users",
+                "monntpy.dev",
+                "monntpy.offtopic",
             ],
         },
     }
-
-
-TORTOISE_ORM = {
-    "connections": {"default": config["backend"]["db_url"]},
-    "apps": {
-        "models": {
-            "models": ["models", "aerich.models"],
-            "default_connection": "default",
-        },
-    },
-}
