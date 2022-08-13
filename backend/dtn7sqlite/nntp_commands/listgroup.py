@@ -62,7 +62,8 @@ async def do_listgroup(client_conn: "ClientConnection") -> Union[List[str], str]
         return StatusCodes.ERR_NOGROUPSELECTED
 
     if num_range is None:
-        msgs = await Message.filter(newsgroup__name=client_conn.selected_group.name)
+        # msgs = await Message.filter(newsgroup__name=client_conn.selected_group.name)
+        msgs = await Message.filter(newsgroup=client_conn.selected_group)
     else:
         parsed_range: ParsedRange = ParsedRange(range_str=num_range, max_value=2**63)
         if parsed_range.parse_status == RangeParseStatus.FAILURE:

@@ -1,5 +1,4 @@
 import asyncio
-import re
 import time
 from asyncio import AbstractEventLoop
 from collections import defaultdict
@@ -28,6 +27,7 @@ from backend.dtn7sqlite.config import config
 from backend.dtn7sqlite.nntp_commands import (
     article,
     capabilities,
+    current,
     date,
     group,
     hdr,
@@ -56,6 +56,7 @@ class DTN7Backend(Backend):
         "article": article.do_article,
         "body": head_body_stat.do_head_body_stat,
         "capabilities": capabilities.do_capabilities,
+        "current": current.do_current,
         "date": date.do_date,
         "group": group.do_group,
         "hdr": hdr.do_hdr,
@@ -317,12 +318,14 @@ class DTN7Backend(Backend):
             # "user_agent": header["user-agent"],
         }
 
-        # TODO use sender email defined in config
-        try:
-            sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
-        except AttributeError as e:
-            self.logger.warning(f"Email address could ot be parsed: {e}")
-            sender_email: str = "not-recognized@email-address.net"
+        # if "sender" in header:
+        #     header["from"] = header["sender"]
+        # try:
+        #     sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
+        # except AttributeError as e:
+        #     self.logger.warning(f"Email address could not be parsed: {e}")
+        #     sender_email: str = "not-recognized@email-address.net"
+        sender_email = config["usenet"]["email"]
         source: str = self._nntpfrom_to_bp7sender(from_=sender_email)
         # TODO: get lifetime, destination settings from settings:
         dtn_args: dict = {
@@ -334,6 +337,7 @@ class DTN7Backend(Backend):
         }
 
         # HASHING
+        # TODO: Skip hashing if this is not a message that was sent from this server!
         message_hash = get_article_hash(
             source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
         )

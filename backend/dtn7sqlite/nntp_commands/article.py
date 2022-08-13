@@ -63,7 +63,7 @@ async def do_article(client_conn: "ClientConnection") -> Union[List[str], str]:
 
     if id_provided:
         # RFC 3977 Sec. 6.2.1.1. First form
-        identifier = identifier.replace("<", "").replace(">", "")
+        # identifier = identifier.replace("<", "").replace(">", "")
         msg: Message = await get_messages_by_msg_id(identifier)
     elif nr_provided:
         # second form
@@ -83,6 +83,7 @@ async def do_article(client_conn: "ClientConnection") -> Union[List[str], str]:
         return StatusCodes.ERR_NOSUCHARTICLE
 
     client_conn.selected_article = msg
+    group_name: str = (await msg.newsgroup).name
 
     try:
         response_status = StatusCodes.STATUS_ARTICLE % (
@@ -96,11 +97,11 @@ async def do_article(client_conn: "ClientConnection") -> Union[List[str], str]:
         response_status,
         f"Path: {server_config['domain_name']}",
         f"From: {msg.from_}",
-        f"Newsgroups: {selected_group.name}",
+        f"Newsgroups: {group_name}",
         f"Date: {msg.created_at.strftime('%a, %d %b %Y %H:%M:%S %Z')}",
         f"Subject: {msg.subject}",
         f"Message-ID: {msg.message_id}",
-        f"Xref: {build_xref(article_id=msg.id, group_name=selected_group.name)}",
+        f"Xref: {build_xref(article_id=msg.id, group_name=group_name)}",
         f"References: {msg.references}",
         f"Path: {msg.path}",
         f"Organization: {msg.organization}",

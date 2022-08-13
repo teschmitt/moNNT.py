@@ -58,7 +58,10 @@ class AsyncNNTPServer:
 
     async def start_serving(self):
         await asyncio.start_server(
-            client_connected_cb=self._accept_client, host=self.hostname, port=self.port
+            client_connected_cb=self._accept_client,
+            host=self.hostname,
+            port=self.port,
+            reuse_address=True,
         )
         if self.backend is not None:
             await self.backend.start()
