@@ -131,13 +131,13 @@ class DTN7Backend(Backend):
             self._group_names.remove(gn)
 
         await self._rest_connector()
-        await self._start_ws_client()
 
         # execute the WS connector in a new thread
         # asyncio.new_event_loop().run_until_complete(self._ws_connector())
         # self._ws_runner = asyncio.create_task(self._ws_connector())
 
         await self._ingest_all_from_dtnd()
+        await self._start_ws_client()
         await self._deliver_spool()
 
     async def _start_ws_client(self):
@@ -257,7 +257,7 @@ class DTN7Backend(Backend):
                 body=data["body"],
                 # path=f"!_ingest_all_from_dtnd",
                 references=data["references"],
-                reply_to=data["reply_to"],
+                # reply_to=data["reply_to"],
             )
             if created:
                 self.logger.debug(
@@ -531,7 +531,7 @@ class DTN7Backend(Backend):
             body=msg_data["body"],
             # path=f"!_handle_sent_article",
             references=msg_data["references"],
-            reply_to=msg_data["reply_to"],
+            # reply_to=msg_data["reply_to"],
             # organization=header["organization"],
             # user_agent=header["user-agent"],
         )
