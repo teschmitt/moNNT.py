@@ -313,7 +313,7 @@ class DTN7Backend(Backend):
             "body": body,
             # "path": f"!{server_config['domain_name']}",
             "references": header["references"],
-            "reply_to": header["reply-to"],
+            # "reply_to": header["reply-to"],
             # "organization": header["organization"],
             # "user_agent": header["user-agent"],
         }
@@ -337,7 +337,6 @@ class DTN7Backend(Backend):
         }
 
         # HASHING
-        # TODO: Skip hashing if this is not a message that was sent from this server!
         message_hash = get_article_hash(
             source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
         )
@@ -548,6 +547,8 @@ class DTN7Backend(Backend):
         del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
         if del_cnt == 1:
             self.logger.debug("Successful, removed spool entry")
+        elif del_cnt == 0:
+            self.logger.debug("Article seems to have remote origin, no spool entry removed.")
         else:
             self.logger.error(
                 f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead"
