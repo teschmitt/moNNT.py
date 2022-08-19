@@ -20,6 +20,7 @@ from cbor2 import CBORDecodeEOF
 from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
 from requests.exceptions import ConnectionError
 from tortoise import Tortoise, run_async
+from tortoise.exceptions import IntegrityError
 
 from backend.base import Backend
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
@@ -505,7 +506,7 @@ class DTN7Backend(Backend):
         group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
         self.logger.debug(f"  Group Name: {ws_struct['dst']} -> {group_name}")
 
-        bid_data: List[str] = ws_struct["bid"].split("-")
+        bid_data: List[str] = ws_struct["bid"].rsplit(sep="-", maxsplit=2)
         src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
         seq_str: str = bid_data[-1]
         ts_str: str = bid_data[-2]
@@ -522,38 +523,46 @@ class DTN7Backend(Backend):
         article_group = await Newsgroup.get_or_none(name=group_name)
         # TODO: Error handling in case group does not exist
 
-        msg: Message = await Message.create(
-            newsgroup=article_group,
-            from_=sender,
-            subject=msg_data["subject"],
-            created_at=dt,
-            message_id=msg_id,
-            body=msg_data["body"],
-            # path=f"!_handle_sent_article",
-            references=msg_data["references"],
-            # reply_to=msg_data["reply_to"],
-            # organization=header["organization"],
-            # user_agent=header["user-agent"],
-        )
-        self.logger.debug(f"Created new entry with id {msg.id} in articles table")
-
-        # remove message from spool HASHING
-        article_hash = get_article_hash(
-            source=ws_struct["src"],
-            destination=ws_struct["dst"],
-            data=msg_data,
-        )
-        self.logger.debug(f"Removing corresponding entry from dtnd message spool: {article_hash}")
-        del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
-        if del_cnt == 1:
-            self.logger.debug("Successful, removed spool entry")
-        elif del_cnt == 0:
-            self.logger.debug("Article seems to have remote origin, no spool entry removed.")
-        else:
-            self.logger.error(
-                f"Something went wrong deleting the entry. {del_cnt} entries were deleted instead"
-                " of 1"
+        try:
+            msg: Message = await Message.create(
+                newsgroup=article_group,
+                from_=sender,
+                subject=msg_data["subject"],
+                created_at=dt,
+                message_id=msg_id,
+                body=msg_data["body"],
+                # path=f"!_handle_sent_article",
+                references=msg_data["references"],
+                # reply_to=msg_data["reply_to"],
+                # organization=header["organization"],
+                # user_agent=header["user-agent"],
             )
+            self.logger.debug(f"Created new entry with id {msg.id} in articles table")
+        except IntegrityError as e:
+            self.logger.error(
+                f"Got IntegrityError from ORM: {e.__str__()}. No new article entry was created for"
+                f" article with message-id {msg_id}."
+            )
+        else:
+            # remove message from spool HASHING
+            article_hash = get_article_hash(
+                source=ws_struct["src"],
+                destination=ws_struct["dst"],
+                data=msg_data,
+            )
+            self.logger.debug(
+                f"Removing corresponding entry from dtnd message spool: {article_hash}"
+            )
+            del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
+            if del_cnt == 1:
+                self.logger.debug("Successful, removed spool entry")
+            elif del_cnt == 0:
+                self.logger.debug("Article seems to have remote origin, no spool entry removed.")
+            else:
+                self.logger.error(
+                    f"Something went wrong deleting the entry. {del_cnt} entries were deleted"
+                    " instead of 1"
+                )
 
     def _bp7sender_to_nntpfrom(self, sender: str) -> str:
         if not sender.startswith("//") and not sender.startswith("dtn://"):
