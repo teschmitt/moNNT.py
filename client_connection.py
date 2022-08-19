@@ -69,7 +69,7 @@ class ClientConnection:
                 data_decode = incoming_data.decode(encoding="utf-8").rstrip()
                 if data_decode == ".":
                     try:
-                        self._server.backend.save_article(article_buffer=self._article_buffer)
+                        await self._server.backend.save_article(article_buffer=self._article_buffer)
                         self._server.send(
                             writer=self._writer, send_obj=StatusCodes.STATUS_POSTSUCCESSFUL
                         )

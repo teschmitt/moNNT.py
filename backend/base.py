@@ -21,7 +21,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def save_article(self, article_buffer: List[str]):
+    async def save_article(self, article_buffer: List[str]):
         pass
 
     @abstractmethod

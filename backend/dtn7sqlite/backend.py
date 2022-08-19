@@ -173,6 +173,13 @@ class DTN7Backend(Backend):
         self.logger.debug(f"Done sending {len(msgs)} spooled messages to DTNd")
 
     async def _send_to_dtnd(self, dtn_args: dict, dtn_payload: dict, hash_: str):
+        """
+
+        Args:
+            dtn_args:
+            dtn_payload:
+            hash_:
+        """
         while self._ws_client is None or not self._ws_client.running:
             self.logger.debug("Waiting for WS client to come online")
             await asyncio.sleep(config["backoff"]["constant_wait"])
@@ -214,7 +221,7 @@ class DTN7Backend(Backend):
         self._rest_client.register(endpoint=sender_endpoint)
 
     async def _ingest_all_from_dtnd(self) -> None:
-        self.logger.debug("Ingesting all newsgroup bundles in DTNd bundle store.")
+        self.logger.info("Ingesting all newsgroup bundles in DTNd bundle store.")
         self.logger.debug(f"Found {len(self._group_names)} active newsgroups on this server.")
 
         while self._rest_client is None:
@@ -267,14 +274,25 @@ class DTN7Backend(Backend):
             else:
                 self.logger.debug(f"Article {msg_id} already present in newsgroup '{group.name}'.")
 
-    def save_article(self, article_buffer: List[str]) -> None:
+    async def save_article(self, article_buffer: List[str]) -> None:
+        """
+        Takes a posted article as a list of strings and does three things with it:
+          1. parses all relevant article information into dta structures
+          2. saves the article data to a spool which contains articles that are sent but do not have
+             a message-id because the dtnd has not acknowledged then yet. In order to later identify
+             the article, a hash on some article data is created and stored along with it
+          3. sends the article data to the dtnd in order to receive a message-id through the WS
+             back-channel and of course to propagate the article in the network
+
+        Args:
+            article_buffer: list of strings containing the raw lines of article data received from
+                            the NNTP client
+        """
+
         # TODO: support cross posting to multiple newsgroups
         #       this entails setting up a M2M relationship between message and newsgroup
         #       https://kb.iu.edu/d/affn
 
-        self._loop.run_until_complete(self._async_save_article(article_buffer=article_buffer))
-
-    async def _async_save_article(self, article_buffer: List[str]):
         self.logger.debug("Sending article to DTNd and local DTN message spool")
         header: DefaultDict[str] = defaultdict(str)
         line: str = article_buffer.pop(0)
@@ -306,19 +324,23 @@ class DTN7Backend(Backend):
 
         group_name: str = article_group.name
         dtn_payload: dict = {
+            "subject": header["subject"],
+            "body": body,
+            "references": header["references"],
+            # disregarded headers (some are mapped to BP7 fields, some are reconstructed later when
+            # the article has been sent to the dtnd, some are dropped entirely:
             # "newsgroup": group_name,
             # "from": header["from"],
-            "subject": header["subject"],
             # "created_at": dt.isoformat(),
             # "message_id": f"<{uuid.uuid4()}@{server_config['domain_name']}>",
-            "body": body,
             # "path": f"!{server_config['domain_name']}",
-            "references": header["references"],
             # "reply_to": header["reply-to"],
             # "organization": header["organization"],
             # "user_agent": header["user-agent"],
         }
 
+        # sender email address is defined through backend config, so we don't need to parse it from
+        # the incoming data:
         # if "sender" in header:
         #     header["from"] = header["sender"]
         # try:
