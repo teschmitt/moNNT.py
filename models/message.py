@@ -11,7 +11,7 @@ class Message(Model):
     from_ = fields.CharField(source_field="from", max_length=255, null=False)
     created_at = fields.DatetimeField(auto_now_add=True, null=False)
     subject = fields.CharField(max_length=255, null=False)
-    message_id = fields.CharField(max_length=255, null=False)
+    message_id = fields.CharField(max_length=255, null=False, unique=True)
     path = fields.TextField(null=True)
 
     newsgroup: fields.ForeignKeyRelation[Newsgroup] = fields.ForeignKeyField(
