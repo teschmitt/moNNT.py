@@ -253,7 +253,7 @@ virtualenv = ">=20.0.8"
 
 [[package]]
 name = "py-dtn7"
-version = "0.2.1a2"
+version = "0.2.1a3"
 description = ""
 category = "main"
 optional = false
@@ -301,7 +301,7 @@ six = ">=1.5"
 
 [[package]]
 name = "pytz"
-version = "2022.1"
+version = "2022.2.1"
 description = "World timezone definitions, modern and historical"
 category = "main"
 optional = false
@@ -454,7 +454,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "9778f43a3ef43bff5280ad31b53d96d489c0d6b4f67bfbf34e3cfd0f98141e46"
+content-hash = "e8dd98c7b958079dd5f40f924592be2183a1157690295dea91e22ed94ec25ac7"
 
 [metadata.files]
 aiosqlite = [
@@ -597,8 +597,8 @@ pre-commit = [
     {file = "pre_commit-2.20.0.tar.gz", hash = "sha256:a978dac7bc9ec0bcee55c18a277d553b0f419d259dadb4b9418ff2d00eb43959"},
 ]
 py-dtn7 = [
-    {file = "py-dtn7-0.2.1a2.tar.gz", hash = "sha256:a7cbcd5d2183c4fcc9ce8e24a99afd84c8a6a84daf188ffcce3108710cc377da"},
-    {file = "py_dtn7-0.2.1a2-py3-none-any.whl", hash = "sha256:297f58efceec1675e15e8947614e867c8c538da0bbe04cb9673389b1fe54e0cf"},
+    {file = "py-dtn7-0.2.1a3.tar.gz", hash = "sha256:1d23d389efeea79316debc833c12d05b242cb72f7860af5e8d8cbb1921a1d1e3"},
+    {file = "py_dtn7-0.2.1a3-py3-none-any.whl", hash = "sha256:3bb3e7d58f3043cc99caa399d94dd649859097c0140b59b9d6284b1465c1688a"},
 ]
 pycodestyle = [
     {file = "pycodestyle-2.9.1-py2.py3-none-any.whl", hash = "sha256:d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b"},
@@ -617,8 +617,8 @@ python-dateutil = [
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
 ]
 pytz = [
-    {file = "pytz-2022.1-py2.py3-none-any.whl", hash = "sha256:e68985985296d9a66a881eb3193b0906246245294a881e7c8afe623866ac6a5c"},
-    {file = "pytz-2022.1.tar.gz", hash = "sha256:1e760e2fe6a8163bc0b3d9a19c4f84342afa0a2affebfaa84b01b978a02ecaa7"},
+    {file = "pytz-2022.2.1-py2.py3-none-any.whl", hash = "sha256:220f481bdafa09c3955dfbdddb7b57780e9a94f5127e35456a48589b9e0c0197"},
+    {file = "pytz-2022.2.1.tar.gz", hash = "sha256:cea221417204f2d1a2aa03ddae3e867921971d0d76f14d87abb4414415bbdcf5"},
 ]
 pyyaml = [
     {file = "PyYAML-6.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:d4db7c7aef085872ef65a8fd7d6d09a14ae91f691dec3e87ee5ee0539d516f53"},

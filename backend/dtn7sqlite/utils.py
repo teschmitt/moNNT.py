@@ -4,8 +4,8 @@ from typing import List
 from models import DTNMessage, Newsgroup
 
 
-async def get_all_newsgroups() -> List[str]:
-    return [ng["name"] for ng in await Newsgroup.all().values("name")]
+async def get_all_newsgroups() -> dict:
+    return {ng.name: ng for ng in await Newsgroup.all()}
 
 
 async def get_all_spooled_messages() -> List[dict]:

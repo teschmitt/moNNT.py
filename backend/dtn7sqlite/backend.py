@@ -12,6 +12,7 @@ from typing import (
     Dict,
     List,
     Optional,
+    Set,
     Union,
 )
 
@@ -51,6 +52,13 @@ from models import DTNMessage, Message, Newsgroup
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
+
+
+def _bundleid_to_messageid(bid: str) -> str:
+    """ """
+    bid_data: List[str] = bid.rsplit(sep="-", maxsplit=2)
+    src_like: str = bid_data[0].replace("dtn://", "").replace("//", "").replace("/", "-")
+    return f"<{bid_data[-2]}-{bid_data[-1]}@{src_like}.dtn>"
 
 
 class DTN7Backend(Backend):
@@ -98,7 +106,8 @@ class DTN7Backend(Backend):
         """
         run_async(self._init_db())
         self._loop = asyncio.new_event_loop()
-        self._group_names: List[str] = self._loop.run_until_complete(get_all_newsgroups())
+        self._newsgroups: dict = self._loop.run_until_complete(get_all_newsgroups())
+        self._group_names: List[str] = list(self._newsgroups.keys())
 
         self._rest_client = None
         self._ws_client = None
@@ -114,7 +123,6 @@ class DTN7Backend(Backend):
         """
         Initialize connections first and then run the start tasks
         """
-        self._group_names: List[str] = await get_all_newsgroups()
 
         # config.toml is single source of truth, so:
         # add all newsgroups that are in config.toml but not in db,
@@ -124,12 +132,14 @@ class DTN7Backend(Backend):
         self.logger.info("Reconciling newsgroup configuration with database")
         for gn in want_set - have_set:
             self.logger.info(f" -> Adding new group '{gn}'")
-            await Newsgroup.create(name=gn)
+            new_group: Newsgroup = await Newsgroup.create(name=gn)
             self._group_names.append(gn)
+            self._newsgroups[gn] = new_group
         for gn in have_set - want_set:
             self.logger.info(f" -> Removing group '{gn}'")
             await Newsgroup.filter(name=gn).delete()
             self._group_names.remove(gn)
+            del self._newsgroups[gn]
 
         self.logger.debug(f"Found {len(self._group_names)} active newsgroups on this server.")
 
@@ -230,27 +240,40 @@ class DTN7Backend(Backend):
             self.logger.debug("Waiting for REST client to come online")
             await asyncio.sleep(config["backoff"]["constant_wait"])
 
-        # TODO: get present bundle ids in dtnd, throw away known bids and filter out unsubbed groups
-        received_bundles: List[Bundle] = []
+        # Gather all known message ids to compare to potential new articles later
+        known_message_ids: Set[str] = set(
+            msg["message_id"] for msg in await Message.all().values("message_id")
+        )
+        received_bundles: Set[str] = set()
         if self._rest_client is not None:
             for group_name in self._group_names:
                 try:
-                    received_bundles.extend(
-                        self._rest_client.get_filtered_bundles(address_part_criteria=group_name)
+                    self.logger.debug(f"Getting known bundles for group '{group_name}'")
+                    new_bundles: List[str] = self._rest_client.get_filtered_bundles(
+                        address_part_criteria=group_name
                     )
+                    self.logger.debug(f"Got {len(new_bundles)} articles for group '{group_name}':")
+                    received_bundles.update(new_bundles)
                 except Exception as e:  # noqa E722
                     self.logger.warning(f"Error getting bundles from REST interface: {e}")
                     self.logger.exception(e)
-        try:
-            # open a transaction and bundle commit to db
-            async with in_transaction() as connection:
-                for bundle in received_bundles:
-                    msg_id: str = (
-                        f"<{bundle.timestamp}-{bundle.sequence_number}@"
-                        f"{bundle.source.replace('dtn://', '').replace('//', '').replace('/', '-')}"
-                        ".dtn>"
-                    )
+        else:
+            await self._rest_connector()
 
+        try:
+            # open a transaction and commit all new articles to db at once
+            async with in_transaction() as connection:
+                for bundle_id in received_bundles:
+                    # filter out known articles PREMATURE
+                    msg_id = _bundleid_to_messageid(bundle_id)
+                    if msg_id in known_message_ids:
+                        self.logger.debug(f"{msg_id} is a duplicate, discarding")
+                        continue
+
+                    if self._rest_client is None:
+                        await self._rest_connector()
+
+                    bundle = Bundle.from_cbor(self._rest_client.download(bundle_id=bundle_id))
                     # map BP7 to NNTP MAPPING
                     from_: str = self._bp7sender_to_nntpfrom(sender=bundle.source)
 
@@ -259,13 +282,12 @@ class DTN7Backend(Backend):
                         .replace("//", "")
                         .replace("/~news", "")
                     )
-                    group: Newsgroup = await Newsgroup.get_or_none(name=group_name)
 
                     data: dict = cbor2.loads(bundle.payload_block.data)
 
                     # self.logger.debug(f"Writing article {msg_id} to DB")
-                    _, created = await Message.get_or_create(
-                        newsgroup=group,
+                    await Message.create(
+                        newsgroup=self._newsgroups[group_name],
                         from_=from_,
                         subject=data["subject"],
                         created_at=from_dtn_timestamp(int(bundle.timestamp)),
@@ -276,14 +298,9 @@ class DTN7Backend(Backend):
                         # reply_to=data["reply_to"],
                         using_db=connection,
                     )
-                    if created:
-                        self.logger.info(
-                            f"Created new newsgroup article {msg_id} in newsgroup '{group.name}'."
-                        )
-                    else:
-                        self.logger.info(
-                            f"Article {msg_id} already present in newsgroup '{group.name}'."
-                        )
+                    self.logger.info(
+                        f"Created new newsgroup article {msg_id} in newsgroup '{group_name}'."
+                    )
         except OperationalError as e:
             self.logger.error(
                 "Something went very wrong committing the batch of ingested articles from the"
@@ -293,8 +310,9 @@ class DTN7Backend(Backend):
 
     async def save_article(self, article_buffer: List[str]) -> None:
         """
-        Takes a posted article as a list of strings and does three things with it:
-          1. parses all relevant article information into dta structures
+        Takes an article posted ba an NNTP client as a list of strings and does three things with
+        it:
+          1. parses all relevant article information into data structures
           2. saves the article data to a spool which contains articles that are sent but do not have
              a message-id because the dtnd has not acknowledged then yet. In order to later identify
              the article, a hash on some article data is created and stored along with it
@@ -546,15 +564,10 @@ class DTN7Backend(Backend):
         group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
         self.logger.debug(f"  Group Name: {ws_struct['dst']} -> {group_name}")
 
-        bid_data: List[str] = ws_struct["bid"].rsplit(sep="-", maxsplit=2)
-        src_like: str = bid_data[0].replace("dtn://", "").replace("/", "-")
-        seq_str: str = bid_data[-1]
-        ts_str: str = bid_data[-2]
-
-        dt: datetime = from_dtn_timestamp(int(ts_str))
+        dt: datetime = from_dtn_timestamp(int(ws_struct["bid"].rsplit(sep="-", maxsplit=2)[-2]))
         self.logger.debug(f"    Datetime: {ws_struct['bid']} -> {dt}")
 
-        msg_id: str = f"<{ts_str}-{seq_str}@{src_like}.dtn>"
+        msg_id: str = _bundleid_to_messageid(ws_struct["bid"])
         self.logger.debug(f"  Message ID: {ws_struct['bid']} -> {msg_id}")
 
         msg_data: dict = cbor2.loads(ws_struct["data"])
