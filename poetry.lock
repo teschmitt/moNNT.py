@@ -253,7 +253,7 @@ virtualenv = ">=20.0.8"
 
 [[package]]
 name = "py-dtn7"
-version = "0.2.1a3"
+version = "0.2.1a4"
 description = ""
 category = "main"
 optional = false
@@ -454,7 +454,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "e8dd98c7b958079dd5f40f924592be2183a1157690295dea91e22ed94ec25ac7"
+content-hash = "a3dc078aa595a8aed1be147bcc2e26bc13c678bf2f107c0606093884b2586867"
 
 [metadata.files]
 aiosqlite = [
@@ -597,8 +597,8 @@ pre-commit = [
     {file = "pre_commit-2.20.0.tar.gz", hash = "sha256:a978dac7bc9ec0bcee55c18a277d553b0f419d259dadb4b9418ff2d00eb43959"},
 ]
 py-dtn7 = [
-    {file = "py-dtn7-0.2.1a3.tar.gz", hash = "sha256:1d23d389efeea79316debc833c12d05b242cb72f7860af5e8d8cbb1921a1d1e3"},
-    {file = "py_dtn7-0.2.1a3-py3-none-any.whl", hash = "sha256:3bb3e7d58f3043cc99caa399d94dd649859097c0140b59b9d6284b1465c1688a"},
+    {file = "py-dtn7-0.2.1a4.tar.gz", hash = "sha256:8957b2854449b5b32bdeebaf980f00b8adde1229a8547ea48cbc10401226c901"},
+    {file = "py_dtn7-0.2.1a4-py3-none-any.whl", hash = "sha256:e24faf27d3896df5d47383aeabf7378f76ebeb366b92d47ce5a7b28220d46c8b"},
 ]
 pycodestyle = [
     {file = "pycodestyle-2.9.1-py2.py3-none-any.whl", hash = "sha256:d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b"},
