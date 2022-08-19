@@ -20,7 +20,8 @@ from cbor2 import CBORDecodeEOF
 from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
 from requests.exceptions import ConnectionError
 from tortoise import Tortoise, run_async
-from tortoise.exceptions import IntegrityError
+from tortoise.exceptions import IntegrityError, OperationalError
+from tortoise.transactions import in_transaction
 
 from backend.base import Backend
 from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
@@ -112,7 +113,6 @@ class DTN7Backend(Backend):
     async def start(self) -> None:
         """
         Initialize connections first and then run the start tasks
-        :return: None
         """
         self._group_names: List[str] = await get_all_newsgroups()
 
@@ -130,6 +130,8 @@ class DTN7Backend(Backend):
             self.logger.info(f" -> Removing group '{gn}'")
             await Newsgroup.filter(name=gn).delete()
             self._group_names.remove(gn)
+
+        self.logger.debug(f"Found {len(self._group_names)} active newsgroups on this server.")
 
         await self._rest_connector()
 
@@ -149,7 +151,6 @@ class DTN7Backend(Backend):
         """
         Gets all spooled messages from the DB and (re)sends them to the DTNd. In here, we assume all
         connections to the DTNd are alive and healthy, so we do only minimal error recovery.
-        :return: None
         """
         self.logger.debug("Getting spooled msgs")
         msgs: List[dict] = await get_all_spooled_messages()
@@ -174,11 +175,12 @@ class DTN7Backend(Backend):
 
     async def _send_to_dtnd(self, dtn_args: dict, dtn_payload: dict, hash_: str):
         """
-
+        Uses the WS interface of the dtnd to send dtn_payload as a cbor encoded payload block.
         Args:
-            dtn_args:
-            dtn_payload:
-            hash_:
+            dtn_args: all relevant dtnd-data: source, destination, lifetime, delivery notification
+            dtn_payload: dict of payload data to be cbor-encoded and sent
+            hash_: hash of spooled message used to update error log of spooled message entry on
+                   difficulties connecting with dtnd
         """
         while self._ws_client is None or not self._ws_client.running:
             self.logger.debug("Waiting for WS client to come online")
@@ -221,8 +223,8 @@ class DTN7Backend(Backend):
         self._rest_client.register(endpoint=sender_endpoint)
 
     async def _ingest_all_from_dtnd(self) -> None:
+        """ """
         self.logger.info("Ingesting all newsgroup bundles in DTNd bundle store.")
-        self.logger.debug(f"Found {len(self._group_names)} active newsgroups on this server.")
 
         while self._rest_client is None:
             self.logger.debug("Waiting for REST client to come online")
@@ -239,40 +241,55 @@ class DTN7Backend(Backend):
                 except Exception as e:  # noqa E722
                     self.logger.warning(f"Error getting bundles from REST interface: {e}")
                     self.logger.exception(e)
-        for bundle in received_bundles:
-            msg_id: str = (
-                f"<{bundle.timestamp}-{bundle.sequence_number}@"
-                f"{bundle.source.replace('dtn://', '').replace('//', '').replace('/', '-')}.dtn>"
+        try:
+            # open a transaction and bundle commit to db
+            async with in_transaction() as connection:
+                for bundle in received_bundles:
+                    msg_id: str = (
+                        f"<{bundle.timestamp}-{bundle.sequence_number}@"
+                        f"{bundle.source.replace('dtn://', '').replace('//', '').replace('/', '-')}"
+                        ".dtn>"
+                    )
+
+                    # map BP7 to NNTP MAPPING
+                    from_: str = self._bp7sender_to_nntpfrom(sender=bundle.source)
+
+                    group_name: str = (
+                        bundle.destination.replace("dtn://", "")
+                        .replace("//", "")
+                        .replace("/~news", "")
+                    )
+                    group: Newsgroup = await Newsgroup.get_or_none(name=group_name)
+
+                    data: dict = cbor2.loads(bundle.payload_block.data)
+
+                    # self.logger.debug(f"Writing article {msg_id} to DB")
+                    _, created = await Message.get_or_create(
+                        newsgroup=group,
+                        from_=from_,
+                        subject=data["subject"],
+                        created_at=from_dtn_timestamp(int(bundle.timestamp)),
+                        message_id=msg_id,
+                        body=data["body"],
+                        # path=f"!_ingest_all_from_dtnd",
+                        references=data["references"],
+                        # reply_to=data["reply_to"],
+                        using_db=connection,
+                    )
+                    if created:
+                        self.logger.info(
+                            f"Created new newsgroup article {msg_id} in newsgroup '{group.name}'."
+                        )
+                    else:
+                        self.logger.info(
+                            f"Article {msg_id} already present in newsgroup '{group.name}'."
+                        )
+        except OperationalError as e:
+            self.logger.error(
+                "Something went very wrong committing the batch of ingested articles from the"
+                f" dtnd. {len(received_bundles)} were not stored in the server DB! Error:"
+                f" {e.__str__()}"
             )
-
-            # map BP7 to NNTP MAPPING
-            from_: str = self._bp7sender_to_nntpfrom(sender=bundle.source)
-
-            group_name: str = (
-                bundle.destination.replace("dtn://", "").replace("//", "").replace("/~news", "")
-            )
-            group: Newsgroup = await Newsgroup.get_or_none(name=group_name)
-
-            data: dict = cbor2.loads(bundle.payload_block.data)
-
-            self.logger.debug(f"Writing article {msg_id} to DB")
-            _, created = await Message.get_or_create(
-                newsgroup=group,
-                from_=from_,
-                subject=data["subject"],
-                created_at=from_dtn_timestamp(int(bundle.timestamp)),
-                message_id=msg_id,
-                body=data["body"],
-                # path=f"!_ingest_all_from_dtnd",
-                references=data["references"],
-                # reply_to=data["reply_to"],
-            )
-            if created:
-                self.logger.debug(
-                    f"Created new newsgroup article {msg_id} in newsgroup '{group.name}'."
-                )
-            else:
-                self.logger.debug(f"Article {msg_id} already present in newsgroup '{group.name}'.")
 
     async def save_article(self, article_buffer: List[str]) -> None:
         """
@@ -479,8 +496,9 @@ class DTN7Backend(Backend):
         struct with lots of handy information we can use to persist the article in our
         local DB, so we scrape all that meaningful DTN-data out of the returned struct and
         let the ORM handle the rest
-        :param ws_data: data sent from the DTNd over the Websockets connection
-        :return: None
+
+        Args:
+            ws_data: data sent from the DTNd over the Websockets connection
         """
         self._loop.run_until_complete(self._async_ws_data_handler(ws_data))
 
