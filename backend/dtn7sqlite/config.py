@@ -16,6 +16,7 @@ except FileNotFoundError:
         "backend": {"db_url": "sqlite://db.sqlite3"},
         "dtnd": {
             "host": "http://127.0.0.1",
+            "node_id": "dtn://n1/",
             "port": 3000,
             "rest_path": "",
             "ws_path": "/ws",

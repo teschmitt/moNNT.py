@@ -1,6 +1,6 @@
 import asyncio
 import time
-from asyncio import AbstractEventLoop
+from asyncio import AbstractEventLoop, Task
 from collections import defaultdict
 from datetime import datetime
 from threading import Thread
@@ -93,6 +93,8 @@ class DTN7Backend(Backend):
     _ws_client: Optional[DTNWSClient]
     _ws_runner: Optional[Thread]
     _loop: AbstractEventLoop
+    _newsgroups: Dict
+    _background_tasks: Set[Task]
 
     def __init__(self, server: "AsyncNNTPServer"):
         super().__init__(server)
@@ -106,8 +108,9 @@ class DTN7Backend(Backend):
         """
         run_async(self._init_db())
         self._loop = asyncio.new_event_loop()
-        self._newsgroups: dict = self._loop.run_until_complete(get_all_newsgroups())
-        self._group_names: List[str] = list(self._newsgroups.keys())
+        self._newsgroups = self._loop.run_until_complete(get_all_newsgroups())
+        self._group_names = list(self._newsgroups.keys())
+        self._background_tasks = set()
 
         self._rest_client = None
         self._ws_client = None
@@ -165,7 +168,10 @@ class DTN7Backend(Backend):
         self.logger.debug("Getting spooled msgs")
         msgs: List[dict] = await get_all_spooled_messages()
 
-        self.logger.debug(f"Sending {len(msgs)} spooled messages to DTNd")
+        while self._ws_client is None or not self._ws_client.running:
+            await asyncio.sleep(config["backoff"]["constant_wait"])
+
+        self.logger.info(f"Sending {len(msgs)} spooled messages to DTNd")
         await asyncio.gather(
             *(
                 self._send_to_dtnd(
@@ -181,7 +187,7 @@ class DTN7Backend(Backend):
                 for msg in msgs
             )
         )
-        self.logger.debug(f"Done sending {len(msgs)} spooled messages to DTNd")
+        self.logger.info(f"Done sending {len(msgs)} spooled messages to DTNd")
 
     async def _send_to_dtnd(self, dtn_args: dict, dtn_payload: dict, hash_: str):
         """
@@ -192,15 +198,15 @@ class DTN7Backend(Backend):
             hash_: hash of spooled message used to update error log of spooled message entry on
                    difficulties connecting with dtnd
         """
-        while self._ws_client is None or not self._ws_client.running:
-            self.logger.debug("Waiting for WS client to come online")
-            await asyncio.sleep(config["backoff"]["constant_wait"])
         try:
             self.logger.debug(f"Sending article to DTNd with {dtn_args}")
             if self._ws_client is not None:
                 self._ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
             else:
-                raise ConnectionError("Previously established connection to WS client failed")
+                raise ConnectionError(
+                    "No current connection to WS client. Article is in spool and will be sent on"
+                    " reconnect."
+                )
         except Exception as e:  # noqa E722
             # log failure in spool entry
             try:
@@ -336,7 +342,9 @@ class DTN7Backend(Backend):
         while len(line) != 0:
             try:
                 if ":" in line:
-                    field_name, field_value = map(lambda s: s.strip(), line.split(":", 1))
+                    field_name, field_value = map(
+                        lambda s: s.strip(), line.split(sep=":", maxsplit=1)
+                    )
                     field_name = field_name.strip().lower()
                     header[field_name] = field_value.strip()
                 elif len(field_name) > 0:
@@ -400,14 +408,19 @@ class DTN7Backend(Backend):
         )
         self.logger.debug(f"Sending article to DB, got message hash: {message_hash}")
 
-        # TODO: This could be gathered with the next await 5 lines down
         dtn_msg: DTNMessage = await DTNMessage.create(
             **dtn_args, data=dtn_payload, hash=message_hash
         )
         self.logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
         self.logger.debug(f"Sending message {dtn_msg.id} to dtnd")
-        await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
-        self.logger.debug(f"Done sending message {dtn_msg.id} to dtnd")
+
+        send_task: Task = asyncio.create_task(
+            self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
+        )
+        self._background_tasks.add(send_task)
+        send_task.add_done_callback(self._background_tasks.discard)
+        # await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
+        # self.logger.debug(f"Done sending message {dtn_msg.id} to dtnd")
 
     async def _init_db(self) -> None:
         await Tortoise.init(db_url=config["backend"]["db_url"], modules={"models": ["models"]})
@@ -535,7 +548,7 @@ class DTN7Backend(Backend):
             self.logger.debug("Received WebSocket data from DTNd. Data determined to by bytes.")
             try:
                 ws_dict: dict = cbor2.loads(ws_data)
-                self.logger.debug(f"Data dict: {ws_dict}")
+                # self.logger.debug(f"Data dict: {ws_dict}")
             except (CBORDecodeEOF, MemoryError) as e:
                 err: RuntimeError = RuntimeError(
                     "Something went wrong decoding a CBOR data object. Any intended save operation "
@@ -626,7 +639,16 @@ class DTN7Backend(Backend):
     def _nntpfrom_to_bp7sender(self, from_: str) -> str:
         if "@" not in from_:
             raise ValueError(f"'{from_}' does not seem to be a valid email address")
-        node_id: str = self._rest_client.node_id
+
+        node_id: str
+        try:
+            node_id = self._rest_client.node_id
+        except AttributeError:
+            self.logger.error(
+                "DTNd not online yet. Using node-id from config.toml. This might produce unexpected"
+                " behaviour, e.g. if DTNd uses a different node id later on."
+            )
+            node_id = config["dtnd"]["node_id"]
         email_name, email_domain = from_.rsplit(sep="@", maxsplit=1)
         # note: node id gets returned as string with trailing backslash: dtn://<NODEID>/
         return f"{node_id}mail/{email_domain}/{email_name}"

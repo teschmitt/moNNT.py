@@ -16,6 +16,7 @@ async def get_all_spooled_messages() -> List[dict]:
 
 def get_article_hash(source: str, destination: str, data: dict) -> str:
     return sha256(
-        f"{source}+{destination}+{data['subject']}+{data['body']}+{data['references']}+"
-        f"{data['reply_to']}".encode(encoding="utf-8")
+        f"{source}+{destination}+{data['subject']}+{data['body']}+{data['references']}".encode(
+            encoding="utf-8"
+        )
     ).hexdigest()
