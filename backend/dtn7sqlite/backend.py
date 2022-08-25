@@ -108,8 +108,8 @@ class DTN7Backend(Backend):
         """
         run_async(self._init_db())
         self._loop = asyncio.new_event_loop()
-        self._newsgroups = self._loop.run_until_complete(get_all_newsgroups())
-        self._group_names = list(self._newsgroups.keys())
+        self._newsgroups = {}
+        self._group_names = []
         self._background_tasks = set()
 
         self._rest_client = None
@@ -130,6 +130,8 @@ class DTN7Backend(Backend):
         # config.toml is single source of truth, so:
         # add all newsgroups that are in config.toml but not in db,
         # delete all in db and not in config
+        self._newsgroups = await get_all_newsgroups()
+        self._group_names = list(self._newsgroups.keys())
         want_set: set = set(config["usenet"]["newsgroups"])
         have_set: set = set(self._group_names)
         self.logger.info("Reconciling newsgroup configuration with database")
@@ -354,7 +356,8 @@ class DTN7Backend(Backend):
                 pass
             line = article_buffer.pop(0)
 
-        article_group = await Newsgroup.get_or_none(name=header["newsgroups"])
+        # article_group = await Newsgroup.get_or_none(name=header["newsgroups"])
+        article_group = self._newsgroups[header["newsgroups"]]
         # TODO: Error handling when newsgroup is not in DB
 
         # we've popped off the complete header, body is just the joined rest
@@ -414,13 +417,13 @@ class DTN7Backend(Backend):
         self.logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
         self.logger.debug(f"Sending message {dtn_msg.id} to dtnd")
 
-        send_task: Task = asyncio.create_task(
-            self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
-        )
-        self._background_tasks.add(send_task)
-        send_task.add_done_callback(self._background_tasks.discard)
-        # await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
-        # self.logger.debug(f"Done sending message {dtn_msg.id} to dtnd")
+        # send_task: Task = self._loop.create_task(
+        #     self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
+        # )
+        # self._background_tasks.add(send_task)
+        # send_task.add_done_callback(self._background_tasks.discard)
+        await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
+        self.logger.debug(f"Done sending message {dtn_msg.id} to dtnd")
 
     async def _init_db(self) -> None:
         await Tortoise.init(db_url=config["backend"]["db_url"], modules={"models": ["models"]})
@@ -439,6 +442,8 @@ class DTN7Backend(Backend):
         initial_wait: float = config["backoff"]["initial_wait"]
         max_retries: int = config["backoff"]["max_retries"]
         reconn_pause: int = config["backoff"]["reconn_pause"]
+
+        self.logger.debug("Setting up WS connection to dtnd")
 
         while not self.server.terminated:
             # naive exponential backoff implementation
@@ -532,6 +537,9 @@ class DTN7Backend(Backend):
             ws_data: data sent from the DTNd over the Websockets connection
         """
         self._loop.run_until_complete(self._async_ws_data_handler(ws_data))
+        # dh_task: Task = self._loop.create_task(self._async_ws_data_handler(ws_data))
+        # self._background_tasks.add(dh_task)
+        # dh_task.add_done_callback(self._background_tasks.discard)
 
     async def _async_ws_data_handler(self, ws_data: Union[str, bytes]) -> None:
         if isinstance(ws_data, str):

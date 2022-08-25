@@ -24,7 +24,7 @@ class AsyncNNTPServer:
         self._article_buffer: List[str] = []
         self._command: Optional[str]
         self._backend: Optional[Backend] = None
-        # self.auth_username
+        self._sockserver = None
 
     def send(self, writer: StreamWriter, send_obj: Union[List[str], str]) -> None:
         if type(send_obj) is str:
@@ -57,7 +57,7 @@ class AsyncNNTPServer:
         self.logger.info(f"Connected to client at {addr}:{port}")
 
     async def start_serving(self):
-        await asyncio.start_server(
+        self._sockserver = await asyncio.start_server(
             client_connected_cb=self._accept_client,
             host=self.hostname,
             port=self.port,
@@ -70,6 +70,8 @@ class AsyncNNTPServer:
         self._terminated = True
         if self.backend is not None:
             self.backend.stop()
+        if self._sockserver is not None:
+            self._sockserver.close()
 
     @property
     def backend(self):
