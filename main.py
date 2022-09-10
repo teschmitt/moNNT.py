@@ -25,7 +25,7 @@ if __name__ == "__main__":
     nntp_server = AsyncNNTPServer(
         hostname=server_config["nntp_hostname"], port=server_config["nntp_port"]
     )
-    nntp_server.backend = DTN7Backend(server=nntp_server)
+    nntp_server.backend = DTN7Backend(server=nntp_server, loop=loop)
 
     loop.run_until_complete(nntp_server.start_serving())
     try:

@@ -92,11 +92,11 @@ class DTN7Backend(Backend):
     _rest_client: Optional[DTNRESTClient]
     _ws_client: Optional[DTNWSClient]
     _ws_runner: Optional[Thread]
-    _loop: AbstractEventLoop
+    # _loop: AbstractEventLoop
     _newsgroups: Dict
     _background_tasks: Set[Task]
 
-    def __init__(self, server: "AsyncNNTPServer"):
+    def __init__(self, server: "AsyncNNTPServer", loop: AbstractEventLoop):
         super().__init__(server)
 
         # Connect to db
@@ -107,7 +107,7 @@ class DTN7Backend(Backend):
         gracefully if it can't be established.
         """
         run_async(self._init_db())
-        self._loop = asyncio.new_event_loop()
+        self._loop = loop  # asyncio.new_event_loop()
         self._newsgroups = {}
         self._group_names = []
         self._background_tasks = set()
@@ -569,8 +569,9 @@ class DTN7Backend(Backend):
                 self.logger.debug("Starting data handler.")
                 await self._handle_sent_article(ws_struct=ws_dict)
             except Exception as e:  # noqa E722
-                # TODO: do some error handling here
-                raise Exception(e)
+                self.logger.exception(e)
+                self.logger.warning("Ignoring the previous error and continuing processing.")
+                # raise Exception(e)
 
         else:
             raise ValueError("Handler received unrecognizable data.")
