@@ -97,7 +97,7 @@ class DTN7Backend(Backend):
     _background_tasks: Set[Task]
 
     def __init__(self, server: "AsyncNNTPServer", loop: AbstractEventLoop):
-        super().__init__(server)
+        super().__init__(server=server, loop=loop)
 
         # Connect to db
         """
