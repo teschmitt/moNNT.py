@@ -23,8 +23,9 @@ delivery_notification = false
 expiry_time = 86400000   # ms make human readable
 email = "t.e.schmitt@posteo.de"
 newsgroups = [
-    "eval.core.monntpy",
-    "germany.hessen.darmstadt.darmstadt",
-    "germany.hessen.darmstadt-dieburg.dieburg",
-    "germany.hessen.darmstadt-dieburg.rossdorf"
+    "monntpy.dev",
+    "monntpy.offtopic",
+    "monntpy.users.tu-darmstadt",
+    "monntpy.users.uni-frankfurt",
+    "monntpy.users.jlu-giessen",
 ]
