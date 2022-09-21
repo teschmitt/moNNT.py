@@ -1,5 +1,6 @@
 import asyncio
 import time
+import zlib
 from asyncio import AbstractEventLoop, Task
 from collections import defaultdict
 from datetime import datetime
@@ -293,6 +294,9 @@ class DTN7Backend(Backend):
 
                     data: dict = cbor2.loads(bundle.payload_block.data)
 
+                    if data.get("compressed", False):
+                        data["body"] = zlib.decompress(data["body"]).decode()
+
                     # self.logger.debug(f"Writing article {msg_id} to DB")
                     await Message.create(
                         newsgroup=self._newsgroups[group_name],
@@ -371,7 +375,6 @@ class DTN7Backend(Backend):
         group_name: str = article_group.name
         dtn_payload: dict = {
             "subject": header["subject"],
-            "body": body,
             "references": header["references"],
             # disregarded headers (some are mapped to BP7 fields, some are reconstructed later when
             # the article has been sent to the dtnd, some are dropped entirely:
@@ -384,6 +387,11 @@ class DTN7Backend(Backend):
             # "organization": header["organization"],
             # "user_agent": header["user-agent"],
         }
+        if config["bundles"]["compressed"]:
+            dtn_payload["compressed"] = True
+            dtn_payload["body"] = zlib.compress(body.encode())
+        else:
+            dtn_payload["body"] = body
 
         # sender email address is defined through backend config, so we don't need to parse it from
         # the incoming data:
@@ -597,6 +605,9 @@ class DTN7Backend(Backend):
         self.logger.debug(f"Creating article entry for {msg_id} in newsgroup DB")
         article_group = await Newsgroup.get_or_none(name=group_name)
         # TODO: Error handling in case group does not exist
+
+        if msg_data.get("compressed", False):
+            msg_data["body"] = zlib.decompress(msg_data["body"]).decode()
 
         try:
             msg: Message = await Message.create(
