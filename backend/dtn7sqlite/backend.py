@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import time
 import zlib
 from asyncio import AbstractEventLoop, Task
@@ -26,7 +27,7 @@ from tortoise.exceptions import IntegrityError, OperationalError
 from tortoise.transactions import in_transaction
 
 from backend.base import Backend
-from backend.dtn7sqlite import get_all_newsgroups, get_all_spooled_messages
+from backend.dtn7sqlite import get_all_newsgroups
 from backend.dtn7sqlite.config import config
 from backend.dtn7sqlite.nntp_commands import (
     article,
@@ -48,18 +49,18 @@ from backend.dtn7sqlite.nntp_commands import (
     post,
     quit_,
 )
-from backend.dtn7sqlite.utils import get_article_hash
+from backend.dtn7sqlite.utils import _bundleid_to_messageid, get_article_hash
 from models import DTNMessage, Message, Newsgroup
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
 
 
-def _bundleid_to_messageid(bid: str) -> str:
-    """ """
-    bid_data: List[str] = bid.rsplit(sep="-", maxsplit=2)
-    src_like: str = bid_data[0].replace("dtn://", "").replace("//", "").replace("/", "-")
-    return f"<{bid_data[-2]}-{bid_data[-1]}@{src_like}.dtn>"
+def _bp7sender_to_nntpfrom(sender: str) -> str:
+    if not sender.startswith("//") and not sender.startswith("dtn://"):
+        raise ValueError(f"'{sender}' does not seem to be a valid DTN identifier")
+    sender_data: List[str] = sender.replace("dtn://", "").replace("//", "").split("/")
+    return f"{sender_data[-1]}@{sender_data[-2]}"
 
 
 class DTN7Backend(Backend):
@@ -169,10 +170,17 @@ class DTN7Backend(Backend):
         connections to the DTNd are alive and healthy, so we do only minimal error recovery.
         """
         self.logger.debug("Getting spooled msgs")
-        msgs: List[dict] = await get_all_spooled_messages()
+        msgs: List[dict] = await DTNMessage.all().values(
+            "source", "destination", "data", "hash", "delivery_notification", "lifetime"
+        )
 
         while self._ws_client is None or not self._ws_client.running:
             await asyncio.sleep(config["backoff"]["constant_wait"])
+
+        # in case of compression, the data["body"] field has to be decoded and decompressed
+        for msg in msgs:
+            if msg["data"].get("compressed", False):
+                msg["data"]["body"] = base64.b64decode(msg["data"]["body"])
 
         self.logger.info(f"Sending {len(msgs)} spooled messages to DTNd")
         await asyncio.gather(
@@ -284,7 +292,7 @@ class DTN7Backend(Backend):
 
                     bundle = Bundle.from_cbor(self._rest_client.download(bundle_id=bundle_id))
                     # map BP7 to NNTP MAPPING
-                    from_: str = self._bp7sender_to_nntpfrom(sender=bundle.source)
+                    from_: str = _bp7sender_to_nntpfrom(sender=bundle.source)
 
                     group_name: str = (
                         bundle.destination.replace("dtn://", "")
@@ -378,16 +386,17 @@ class DTN7Backend(Backend):
             "references": header["references"],
             # disregarded headers (some are mapped to BP7 fields, some are reconstructed later when
             # the article has been sent to the dtnd, some are dropped entirely:
-            # "newsgroup": group_name,
-            # "from": header["from"],
-            # "created_at": dt.isoformat(),
-            # "message_id": f"<{uuid.uuid4()}@{server_config['domain_name']}>",
-            # "path": f"!{server_config['domain_name']}",
-            # "reply_to": header["reply-to"],
-            # "organization": header["organization"],
-            # "user_agent": header["user-agent"],
+            # "newsgroup": "",
+            # "from": "",
+            # "created_at": "",
+            # "message_id": "",
+            # "path": "",
+            # "reply_to": "",
+            # "organization": "",
+            # "user_agent": "",
         }
-        if config["bundles"]["compressed"]:
+        if config["bundles"]["compress_body"]:
+            self.logger.debug("Compression is turned on, compressing body with zlib")
             dtn_payload["compressed"] = True
             dtn_payload["body"] = zlib.compress(body.encode())
         else:
@@ -419,8 +428,14 @@ class DTN7Backend(Backend):
         )
         self.logger.debug(f"Sending article to DB, got message hash: {message_hash}")
 
+        # in case the body is compressed we need to encode it with Base64 in order
+        # to insert it into the DB since the payload field has a JSON type
+        spool_payload: dict = dtn_payload.copy()
+        if isinstance(spool_payload["body"], bytes):
+            self.logger.debug("Base64 encoding compressed body for spooling")
+            spool_payload["body"] = base64.b64encode(spool_payload["body"]).decode()
         dtn_msg: DTNMessage = await DTNMessage.create(
-            **dtn_args, data=dtn_payload, hash=message_hash
+            **dtn_args, data=spool_payload, hash=message_hash
         )
         self.logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
         self.logger.debug(f"Sending message {dtn_msg.id} to dtnd")
@@ -588,7 +603,7 @@ class DTN7Backend(Backend):
         self.logger.debug("Mapping BP7 to NNTP fields")
 
         # map BP7 to NNTP fields MAPPING
-        sender: str = self._bp7sender_to_nntpfrom(ws_struct["src"])
+        sender: str = _bp7sender_to_nntpfrom(ws_struct["src"])
         self.logger.debug(f"      Sender: {ws_struct['src']} -> {sender}")
 
         group_name: str = ws_struct["dst"].replace("dtn://", "").replace("//", "").split("/")[0]
@@ -649,12 +664,6 @@ class DTN7Backend(Backend):
                     f"Something went wrong deleting the entry. {del_cnt} entries were deleted"
                     " instead of 1"
                 )
-
-    def _bp7sender_to_nntpfrom(self, sender: str) -> str:
-        if not sender.startswith("//") and not sender.startswith("dtn://"):
-            raise ValueError(f"'{sender}' does not seem to be a valid DTN identifier")
-        sender_data: List[str] = sender.replace("dtn://", "").replace("//", "").split("/")
-        return f"{sender_data[-1]}@{sender_data[-2]}"
 
     def _nntpfrom_to_bp7sender(self, from_: str) -> str:
         if "@" not in from_:

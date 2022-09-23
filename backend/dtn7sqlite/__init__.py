@@ -1,4 +1,1 @@
-from backend.dtn7sqlite.utils import (  # noqa F401
-    get_all_newsgroups,
-    get_all_spooled_messages,
-)
+from backend.dtn7sqlite.utils import get_all_newsgroups  # noqa F401
