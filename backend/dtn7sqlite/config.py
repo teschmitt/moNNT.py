@@ -1,6 +1,7 @@
 from logging import Logger
 from pathlib import Path
 
+from pytimeparse2 import parse
 from toml import load
 
 from logger import global_logger
@@ -10,6 +11,13 @@ logger: Logger = global_logger()
 try:
     toml_path: str = str(Path(__file__).resolve().parent / "config.toml")
     config = load(toml_path)
+    try:
+        config["bundles"]["lifetime"] = parse(config["bundles"]["lifetime"]) * 1000
+    except TypeError:
+        # pytimeparse2 returns None when string is not parseable so multiplication
+        # will throw a TypeError
+        config["bundles"]["lifetime"] = 86400000
+
 except FileNotFoundError:
     logger.error("File 'config.toml' not found in backend root directory. Using defaults.")
     config = {

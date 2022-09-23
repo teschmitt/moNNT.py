@@ -16,7 +16,7 @@ reconn_pause = 300
 constant_wait = 0.75
 
 [bundles]
-lifetime = 86400000
+lifetime = "2d" # check backend README for formatting rules
 delivery_notification = false
 compress_body = true
 

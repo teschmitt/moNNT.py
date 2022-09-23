@@ -12,6 +12,7 @@ py-dtn7 = "^0.2.1-alpha4"
 nest-asyncio = "^1.5.5"
 toml = "^0.10.2"
 python-dateutil = "^2.8.2"
+pytimeparse2 = "^1.5.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^5.0.4"
