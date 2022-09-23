@@ -33,7 +33,7 @@ except FileNotFoundError:
         "backoff": {
             "initial_wait": 0.1,
             "max_retries": 20,
-            "reconn_pause": 300,
+            "reconnection_pause": 300,
             "constant_wait": 0.75,
         },
         "bundles": {"lifetime": 86400000, "delivery_notification": False},

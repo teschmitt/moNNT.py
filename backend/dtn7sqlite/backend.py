@@ -454,7 +454,7 @@ class DTN7Backend(Backend):
         retries: int = 0
         initial_wait: float = config["backoff"]["initial_wait"]
         max_retries: int = config["backoff"]["max_retries"]
-        reconn_pause: int = config["backoff"]["reconn_pause"]
+        reconnection_pause: int = config["backoff"]["reconnection_pause"]
 
         self.logger.debug("Setting up WS connection to dtnd")
 
@@ -477,10 +477,11 @@ class DTN7Backend(Backend):
                     )
                 else:
                     self.logger.error(
-                        "DTNd seems permanently down. Articles will be saved to spool and sent upon"
-                        f" reconnection. Reconnection attempts paused for {reconn_pause} seconds."
+                        "DTNd seems permanently down. Articles will be saved to spool and sent"
+                        " upon reconnection. Reconnection attempts paused for"
+                        f" {reconnection_pause} seconds."
                     )
-                    time.sleep(reconn_pause)
+                    time.sleep(reconnection_pause)
                     retries = 0
                     self.logger.info("Restarting reconnection attempts with DTNd.")
                 continue
