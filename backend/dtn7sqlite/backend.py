@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import time
 import zlib
 from asyncio import AbstractEventLoop, Task
@@ -178,9 +177,9 @@ class DTN7Backend(Backend):
             await asyncio.sleep(config["backoff"]["constant_wait"])
 
         # in case of compression, the data["body"] field has to be decoded and decompressed
-        for msg in msgs:
-            if msg["data"].get("compressed", False):
-                msg["data"]["body"] = base64.b64decode(msg["data"]["body"])
+        # for msg in msgs:
+        #     if msg["data"].get("compressed", False):
+        #         msg["data"]["body"] = base64.b64decode(msg["data"]["body"])
 
         self.logger.info(f"Sending {len(msgs)} spooled messages to DTNd")
         await asyncio.gather(
@@ -386,14 +385,7 @@ class DTN7Backend(Backend):
             "references": header["references"],
             # disregarded headers (some are mapped to BP7 fields, some are reconstructed later when
             # the article has been sent to the dtnd, some are dropped entirely:
-            # "newsgroup": "",
-            # "from": "",
-            # "created_at": "",
-            # "message_id": "",
-            # "path": "",
-            # "reply_to": "",
-            # "organization": "",
-            # "user_agent": "",
+            # newsgroup, from, created_at, message_id, path, reply_to, organization, user_agent
         }
         if config["bundles"]["compress_body"]:
             self.logger.debug("Compression is turned on, compressing body with zlib")
@@ -422,18 +414,16 @@ class DTN7Backend(Backend):
             "lifetime": config["bundles"]["lifetime"],
         }
 
+        # in case the body is compressed we need to fetch the textform body in order to insert it
+        # into the DB since the payload field has a JSON type and will not accept byte type data
+        spool_payload: dict = dtn_payload.copy()
+        if config["bundles"]["compress_body"]:
+            spool_payload["body"] = body
         # HASHING
         message_hash = get_article_hash(
-            source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
+            source=dtn_args["source"], destination=dtn_args["destination"], data=spool_payload
         )
         self.logger.debug(f"Sending article to DB, got message hash: {message_hash}")
-
-        # in case the body is compressed we need to encode it with Base64 in order
-        # to insert it into the DB since the payload field has a JSON type
-        spool_payload: dict = dtn_payload.copy()
-        if isinstance(spool_payload["body"], bytes):
-            self.logger.debug("Base64 encoding compressed body for spooling")
-            spool_payload["body"] = base64.b64encode(spool_payload["body"]).decode()
         dtn_msg: DTNMessage = await DTNMessage.create(
             **dtn_args, data=spool_payload, hash=message_hash
         )
@@ -590,7 +580,7 @@ class DTN7Backend(Backend):
 
             try:
                 self.logger.debug("Starting data handler.")
-                await self._handle_sent_article(ws_struct=ws_dict)
+                await self._handle_backchannel_data(ws_struct=ws_dict)
             except Exception as e:  # noqa E722
                 self.logger.exception(e)
                 self.logger.warning("Ignoring the previous error and continuing processing.")
@@ -599,7 +589,7 @@ class DTN7Backend(Backend):
         else:
             raise ValueError("Handler received unrecognizable data.")
 
-    async def _handle_sent_article(self, ws_struct: dict):
+    async def _handle_backchannel_data(self, ws_struct: dict):
         self.logger.debug("Mapping BP7 to NNTP fields")
 
         # map BP7 to NNTP fields MAPPING
@@ -632,11 +622,7 @@ class DTN7Backend(Backend):
                 created_at=dt,
                 message_id=msg_id,
                 body=msg_data["body"],
-                # path=f"!_handle_sent_article",
                 references=msg_data["references"],
-                # reply_to=msg_data["reply_to"],
-                # organization=header["organization"],
-                # user_agent=header["user-agent"],
             )
             self.logger.debug(f"Created new entry with id {msg.id} in articles table")
         except IntegrityError as e:
