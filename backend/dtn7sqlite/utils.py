@@ -1,17 +1,11 @@
 from hashlib import sha256
 from typing import List
 
-from models import DTNMessage, Newsgroup
+from models import Newsgroup
 
 
 async def get_all_newsgroups() -> dict:
     return {ng.name: ng for ng in await Newsgroup.all()}
-
-
-async def get_all_spooled_messages() -> List[dict]:
-    return await DTNMessage.all().values(
-        "source", "destination", "data", "hash", "delivery_notification", "lifetime"
-    )
 
 
 def get_article_hash(source: str, destination: str, data: dict) -> str:
@@ -20,3 +14,10 @@ def get_article_hash(source: str, destination: str, data: dict) -> str:
             encoding="utf-8"
         )
     ).hexdigest()
+
+
+def _bundleid_to_messageid(bid: str) -> str:
+    """ """
+    bid_data: List[str] = bid.rsplit(sep="-", maxsplit=2)
+    src_like: str = bid_data[0].replace("dtn://", "").replace("//", "").replace("/", "-")
+    return f"<{bid_data[-2]}-{bid_data[-1]}@{src_like}.dtn>"

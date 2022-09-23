@@ -18,6 +18,7 @@ constant_wait = 0.75
 [bundles]
 lifetime = 86400000
 delivery_notification = false
+compress_body = true
 
 [usenet]
 expiry_time = 86400000   # ms make human readable
