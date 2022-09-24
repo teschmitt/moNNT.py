@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
@@ -28,14 +28,14 @@ async def do_next(client_conn: "ClientConnection") -> str:
     """
 
     selected_group: Newsgroup = client_conn.selected_group
-    selected_article: Message = client_conn.selected_article
+    selected_article: Article = client_conn.selected_article
     if selected_group is None:
         return StatusCodes.ERR_NOGROUPSELECTED
     if selected_article is None:
         return StatusCodes.ERR_NOARTICLESELECTED
 
-    msg: Message = (
-        await Message.filter(newsgroup__name=selected_group.name, id__gt=selected_article.id)
+    msg: Article = (
+        await Article.filter(newsgroup__name=selected_group.name, id__gt=selected_article.id)
         .order_by("id")
         .first()
     )

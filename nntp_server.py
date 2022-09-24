@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 from backend.base import Backend
 from client_connection import ClientConnection
 from logger import global_logger
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 
 
 class AsyncNNTPServer:
@@ -19,7 +19,7 @@ class AsyncNNTPServer:
         self._empty_token_counter: int = 0
         self._cmd_args: Optional[List[str]] = None
         self._selected_group: Optional[Newsgroup] = None  # field to save a selected group
-        self._selected_article: Optional[Message] = None  # field to save a selected group
+        self._selected_article: Optional[Article] = None  # field to save a selected group
         self._post_mode: bool = False
         self._article_buffer: List[str] = []
         self._command: Optional[str]

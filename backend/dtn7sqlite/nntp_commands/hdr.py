@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, List, Optional, Union
 
-from models import Message
+from models import Article
 from status_codes import StatusCodes
 from utils import (
     ParsedRange,
@@ -14,12 +14,12 @@ if TYPE_CHECKING:
     from client_connection import ClientConnection
 
 
-async def augment_article(art: Message) -> Message:
+async def augment_article(art: Article) -> Article:
     await art.fetch_related("newsgroup")
     return art
 
 
-def get_header(art: Message, field_name: str) -> str:
+def get_header(art: Article, field_name: str) -> str:
     fn = field_name.lower()
     if fn == "subject":
         return art.subject
@@ -88,7 +88,7 @@ async def do_hdr(client_conn: "ClientConnection") -> Union[List[str], str]:
         return StatusCodes.ERR_CMDSYNTAXERROR
 
     identifier: Optional[str] = tokens[1] if len(tokens) > 1 else None
-    articles: List[Message] = []
+    articles: List[Article] = []
     status_str: str
     msg_id_provided: bool = False
 
@@ -100,7 +100,7 @@ async def do_hdr(client_conn: "ClientConnection") -> Union[List[str], str]:
             parsed_range: ParsedRange = ParsedRange(range_str=identifier, max_value=2**63)
             if parsed_range.parse_status == RangeParseStatus.FAILURE:
                 return StatusCodes.ERR_NOTPERFORMED
-            articles = await Message.filter(
+            articles = await Article.filter(
                 newsgroup__name=client_conn.selected_group.name,
                 id__gte=parsed_range.start,
                 id__lte=parsed_range.stop,
@@ -111,7 +111,7 @@ async def do_hdr(client_conn: "ClientConnection") -> Union[List[str], str]:
         elif "<" in identifier and ">" in identifier:
             msg_id_provided = True
             articles = [
-                await Message.get_or_none(message_id=identifier).prefetch_related("newsgroup")
+                await Article.get_or_none(message_id=identifier).prefetch_related("newsgroup")
             ]
             if len(articles) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLE

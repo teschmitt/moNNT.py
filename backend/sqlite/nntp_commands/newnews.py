@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, List, Union
 
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import get_datetime, groupname_filter
 
@@ -39,7 +39,7 @@ async def do_newnews(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
         groups=(await Newsgroup.all().values("id", "name")), pattern=wildmat
     )
     group_ids: List[int] = [g["id"] for g in matching_groups]
-    articles: List[dict] = await Message.filter(
+    articles: List[dict] = await Article.filter(
         created_at__gte=gte_date, newsgroup__id__in=group_ids
     ).values("message_id")
 

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List, Union
 
 from tortoise.queryset import QuerySet
 
-from models import Message
+from models import Article
 from status_codes import StatusCodes
 from utils import get_bytes_len, get_num_lines
 
@@ -10,8 +10,8 @@ if TYPE_CHECKING:
     from client_connection import ClientConnection
 
 
-def get_current_messages(limit: int) -> QuerySet[Message]:
-    return Message.all().order_by("created_at").limit(limit)
+def get_current_messages(limit: int) -> QuerySet[Article]:
+    return Article.all().order_by("created_at").limit(limit)
 
 
 async def do_current(client_conn: "ClientConnection") -> Union[List[str], str]:
@@ -20,7 +20,7 @@ async def do_current(client_conn: "ClientConnection") -> Union[List[str], str]:
     """
 
     options: List[str] = client_conn.cmd_args
-    article_list: List[Message] = []
+    article_list: List[Article] = []
     lim: int = 10
 
     if options is not None and len(options) > 0 or options is None:

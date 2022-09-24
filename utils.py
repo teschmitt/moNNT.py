@@ -8,7 +8,7 @@ from typing import List
 import toml
 
 from config import server_config
-from models import Message
+from models import Article
 
 
 class RangeParseStatus(Enum):
@@ -63,7 +63,7 @@ def build_xref(article_id: int, group_name: str) -> str:
     return f"{server_config['domain_name']} {group_name}:{article_id}"
 
 
-def get_bytes_len(article: Message) -> int:
+def get_bytes_len(article: Article) -> int:
     result = 0
     for val in article.__dict__.values():
         if type(val) is not bool:
@@ -71,7 +71,7 @@ def get_bytes_len(article: Message) -> int:
     return result
 
 
-def get_num_lines(article: Message) -> int:
+def get_num_lines(article: Article) -> int:
     return len(article.body.split("\n"))
 
 

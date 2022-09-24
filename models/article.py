@@ -4,7 +4,7 @@ from tortoise.models import Model
 from models.newsgroup import Newsgroup
 
 
-class Message(Model):
+class Article(Model):
     id = fields.BigIntField(pk=True)
 
     # mandatory headers
@@ -27,10 +27,10 @@ class Message(Model):
 
     # more on getting the complete relationship tree here:
     # https://tortoise-orm.readthedocs.io/en/latest/examples/basic.html
-    # parent_id: fields.ForeignKeyNullableRelation["Message"] = fields.ForeignKeyField(
-    #     "models.Message", related_name="children", null=True
+    # parent_id: fields.ForeignKeyNullableRelation["Article"] = fields.ForeignKeyField(
+    #     "models.Article", related_name="children", null=True
     # )
-    # children: fields.ForeignKeyNullableRelation["Message"]
+    # children: fields.ForeignKeyNullableRelation["Article"]
 
     body = fields.TextField(null=False)
 
@@ -45,7 +45,3 @@ class Message(Model):
             f"{self.body}\n"
             "---------------------------------------------------------"
         )
-
-    class PydanticMeta:
-        exclude = ("newsgroup",)
-        computed = ()

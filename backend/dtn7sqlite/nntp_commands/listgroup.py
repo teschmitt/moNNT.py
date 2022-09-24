@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, List, Optional, Union
 from tortoise.functions import Count, Max, Min
 from tortoise.queryset import ValuesQuery
 
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import ParsedRange, RangeParseStatus
 
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 def get_group_stats(group_name: str) -> ValuesQuery:
     return (
-        Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
+        Article.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
         .filter(newsgroup__name=group_name)
         .values(name="newsgroup__name", count="count", min="min", max="max")
     )
@@ -48,7 +48,7 @@ async def do_listgroup(client_conn: "ClientConnection") -> Union[List[str], str]
     group_name: Optional[str] = tokens[0] if len(tokens) > 0 else None
     num_range: Optional[str] = tokens[1] if len(tokens) > 1 else None
     result: List[str]
-    msgs: List[Message]
+    msgs: List[Article]
     status_str: str
 
     if group_name is not None:
@@ -63,12 +63,12 @@ async def do_listgroup(client_conn: "ClientConnection") -> Union[List[str], str]
 
     if num_range is None:
         # msgs = await Message.filter(newsgroup__name=client_conn.selected_group.name)
-        msgs = await Message.filter(newsgroup=client_conn.selected_group)
+        msgs = await Article.filter(newsgroup=client_conn.selected_group)
     else:
         parsed_range: ParsedRange = ParsedRange(range_str=num_range, max_value=2**63)
         if parsed_range.parse_status == RangeParseStatus.FAILURE:
             return StatusCodes.ERR_NOTPERFORMED
-        msgs = await Message.filter(
+        msgs = await Article.filter(
             newsgroup__name=client_conn.selected_group.name,
             id__gte=parsed_range.start,
             id__lte=parsed_range.stop,

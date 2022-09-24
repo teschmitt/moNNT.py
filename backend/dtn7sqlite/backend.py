@@ -49,7 +49,7 @@ from backend.dtn7sqlite.nntp_commands import (
     quit_,
 )
 from backend.dtn7sqlite.utils import _bundleid_to_messageid, get_article_hash
-from models import DTNMessage, Message, Newsgroup
+from models import Article, DTNMessage, Newsgroup
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
@@ -211,6 +211,8 @@ class DTN7Backend(Backend):
         try:
             self.logger.debug(f"Sending article to DTNd with {dtn_args}")
             if self._ws_client is not None:
+                self.logger.debug(f"Sending dtn_args: {dtn_args}")
+                self.logger.debug(f"Sending dtn_payload: {dtn_payload}")
                 self._ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
             else:
                 raise ConnectionError(
@@ -258,7 +260,7 @@ class DTN7Backend(Backend):
 
         # Gather all known message ids to compare to potential new articles later
         known_message_ids: Set[str] = set(
-            msg["message_id"] for msg in await Message.all().values("message_id")
+            msg["message_id"] for msg in await Article.all().values("message_id")
         )
         received_bundles: Set[str] = set()
         if self._rest_client is not None:
@@ -268,7 +270,7 @@ class DTN7Backend(Backend):
                     new_bundles: List[str] = self._rest_client.get_filtered_bundles(
                         address_part_criteria=group_name
                     )
-                    self.logger.debug(f"Got {len(new_bundles)} articles for group '{group_name}':")
+                    self.logger.debug(f"Got {len(new_bundles)} articles for group '{group_name}'")
                     received_bundles.update(new_bundles)
                 except Exception as e:  # noqa E722
                     self.logger.warning(f"Error getting bundles from REST interface: {e}")
@@ -289,37 +291,43 @@ class DTN7Backend(Backend):
                     if self._rest_client is None:
                         await self._rest_connector()
 
-                    bundle = Bundle.from_cbor(self._rest_client.download(bundle_id=bundle_id))
-                    # map BP7 to NNTP MAPPING
-                    from_: str = _bp7sender_to_nntpfrom(sender=bundle.source)
+                    try:
+                        bundle = Bundle.from_cbor(self._rest_client.download(bundle_id=bundle_id))
+                    except Exception as e:
+                        self.logger.error(
+                            f"Bundle with ID {bundle_id} could not be deserialized: {e}"
+                        )
+                    else:
+                        # map BP7 to NNTP MAPPING
+                        from_: str = _bp7sender_to_nntpfrom(sender=bundle.source)
 
-                    group_name: str = (
-                        bundle.destination.replace("dtn://", "")
-                        .replace("//", "")
-                        .replace("/~news", "")
-                    )
+                        group_name: str = (
+                            bundle.destination.replace("dtn://", "")
+                            .replace("//", "")
+                            .replace("/~news", "")
+                        )
 
-                    data: dict = cbor2.loads(bundle.payload_block.data)
+                        data: dict = cbor2.loads(bundle.payload_block.data)
 
-                    if data.get("compressed", False):
-                        data["body"] = zlib.decompress(data["body"]).decode()
+                        if data.get("compressed", False):
+                            data["body"] = zlib.decompress(data["body"]).decode()
 
-                    # self.logger.debug(f"Writing article {msg_id} to DB")
-                    await Message.create(
-                        newsgroup=self._newsgroups[group_name],
-                        from_=from_,
-                        subject=data["subject"],
-                        created_at=from_dtn_timestamp(int(bundle.timestamp)),
-                        message_id=msg_id,
-                        body=data["body"],
-                        # path=f"!_ingest_all_from_dtnd",
-                        references=data["references"],
-                        # reply_to=data["reply_to"],
-                        using_db=connection,
-                    )
-                    self.logger.info(
-                        f"Created new newsgroup article {msg_id} in newsgroup '{group_name}'."
-                    )
+                        # self.logger.debug(f"Writing article {msg_id} to DB")
+                        await Article.create(
+                            newsgroup=self._newsgroups[group_name],
+                            from_=from_,
+                            subject=data["subject"],
+                            created_at=from_dtn_timestamp(int(bundle.timestamp)),
+                            message_id=msg_id,
+                            body=data["body"],
+                            # path=f"!_ingest_all_from_dtnd",
+                            references=data["references"],
+                            # reply_to=data["reply_to"],
+                            using_db=connection,
+                        )
+                        self.logger.info(
+                            f"Created new newsgroup article {msg_id} in newsgroup '{group_name}'."
+                        )
         except OperationalError as e:
             self.logger.error(
                 "Something went very wrong committing the batch of ingested articles from the"
@@ -616,7 +624,7 @@ class DTN7Backend(Backend):
             msg_data["body"] = zlib.decompress(msg_data["body"]).decode()
 
         try:
-            msg: Message = await Message.create(
+            msg: Article = await Article.create(
                 newsgroup=article_group,
                 from_=sender,
                 subject=msg_data["subject"],

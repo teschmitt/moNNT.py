@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, DefaultDict
 from dateutil.parser import parse as date_parse
 
 from config import server_config
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
@@ -44,7 +44,7 @@ async def save_article(server_state: "AsyncNNTPServer") -> None:
     header["references"].replace("\t", "")
 
     try:
-        await Message.create(
+        await Article.create(
             newsgroup=group,
             from_=header["from"],
             subject=header["subject"],

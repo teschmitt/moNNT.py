@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, List, Optional, Union
 from tortoise.queryset import QuerySetSingle
 
 from config import server_config
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import build_xref
 
@@ -11,12 +11,12 @@ if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
 
 
-def get_messages_by_num(num: int, group: Newsgroup) -> QuerySetSingle[Message]:
-    return Message.get_or_none(id=num, newsgroup=group)
+def get_messages_by_num(num: int, group: Newsgroup) -> QuerySetSingle[Article]:
+    return Article.get_or_none(id=num, newsgroup=group)
 
 
-def get_messages_by_msg_id(message_id: str) -> QuerySetSingle[Message]:
-    return Message.get_or_none(message_id=message_id)
+def get_messages_by_msg_id(message_id: str) -> QuerySetSingle[Article]:
+    return Article.get_or_none(message_id=message_id)
 
 
 async def do_article(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
@@ -64,7 +64,7 @@ async def do_article(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
     if id_provided:
         # RFC 3977 Sec. 6.2.1.1. First form
         identifier = identifier.replace("<", "").replace(">", "")
-        msg: Message = await get_messages_by_msg_id(identifier)
+        msg: Article = await get_messages_by_msg_id(identifier)
     elif nr_provided:
         # second form
         if selected_group is None:
@@ -74,10 +74,10 @@ async def do_article(server_state: "AsyncNNTPServer") -> Union[List[str], str]:
             num: int = int(identifier)
         except ValueError:
             return StatusCodes.ERR_NOARTICLESELECTED
-        msg: Message = await get_messages_by_num(num, selected_group)
+        msg: Article = await get_messages_by_num(num, selected_group)
     else:
         # third form
-        msg: Message = server_state.selected_article
+        msg: Article = server_state.selected_article
 
     if msg is None:
         return StatusCodes.ERR_NOSUCHARTICLE

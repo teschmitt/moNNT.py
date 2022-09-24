@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List, Optional, Union
 
 from tortoise.queryset import QuerySet
 
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import (
     ParsedRange,
@@ -16,8 +16,8 @@ if TYPE_CHECKING:
     from client_connection import ClientConnection
 
 
-def get_messages(group: Newsgroup, start: int, stop: int) -> QuerySet[Message]:
-    return Message.filter(newsgroup__name=group.name, id__gte=start, id__lte=stop).order_by(
+def get_messages(group: Newsgroup, start: int, stop: int) -> QuerySet[Article]:
+    return Article.filter(newsgroup__name=group.name, id__gte=start, id__lte=stop).order_by(
         "created_at"
     )
 
@@ -56,7 +56,7 @@ async def do_over(client_conn: "ClientConnection") -> Union[List[str], str]:
     selected_group: Optional[Newsgroup] = client_conn.selected_group
     selected_article = client_conn.selected_article
     options: List[str] = client_conn.cmd_args
-    article_list: List[Message] = []
+    article_list: List[Article] = []
 
     if len(options) == 0 or options is None:
         if selected_group is None:
@@ -68,7 +68,7 @@ async def do_over(client_conn: "ClientConnection") -> Union[List[str], str]:
         arg: str = options[0]
 
         if "<" in arg and ">" in arg:
-            article_list = [await Message.get_or_none(message_id=arg)]
+            article_list = [await Article.get_or_none(message_id=arg)]
             if len(article_list) == 0:
                 return StatusCodes.ERR_NOSUCHARTICLE
         else:

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from tortoise.functions import Count, Max, Min
 
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:
@@ -33,10 +33,10 @@ async def do_group(client_conn: "ClientConnection") -> str:
     client_conn.selected_group = new_group
     # if the selected group is empty, filter.first() will return None so this is RFC-compliant:
     client_conn.selected_article = (
-        await Message.filter(newsgroup=client_conn.selected_group).order_by("id").first()
+        await Article.filter(newsgroup=client_conn.selected_group).order_by("id").first()
     )
     group_stats: Optional[dict] = (
-        await Message.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
+        await Article.annotate(count=Count("id"), max=Max("id"), min=Min("id"))
         .group_by("newsgroup__id")
         .filter(newsgroup=client_conn.selected_group)
         .first()

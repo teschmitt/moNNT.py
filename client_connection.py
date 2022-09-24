@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from config import server_config
 from logger import global_logger
-from models import Message, Newsgroup
+from models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import get_version
 
@@ -28,7 +28,7 @@ class ClientConnection:
         self._empty_token_counter: int = 0
         self._cmd_args: Optional[List[str]] = None
         self._selected_group: Optional[Newsgroup] = None
-        self._selected_article: Optional[Message] = None
+        self._selected_article: Optional[Article] = None
         self._post_mode: bool = False
         self._article_buffer: List[str] = []
         self._command: str = ""
@@ -145,7 +145,7 @@ class ClientConnection:
         self._post_mode = val
 
     @property
-    def selected_article(self) -> Optional[Message]:
+    def selected_article(self) -> Optional[Article]:
         return self._selected_article
 
     @selected_article.setter
