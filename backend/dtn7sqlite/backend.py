@@ -48,7 +48,11 @@ from backend.dtn7sqlite.nntp_commands import (
     post,
     quit_,
 )
-from backend.dtn7sqlite.utils import _bundleid_to_messageid, get_article_hash
+from backend.dtn7sqlite.utils import (
+    _bundleid_to_messageid,
+    _delete_expired_articles,
+    get_article_hash,
+)
 from models import Article, DTNMessage, Newsgroup
 
 if TYPE_CHECKING:
@@ -158,6 +162,10 @@ class DTN7Backend(Backend):
         await self._ingest_all_from_dtnd()
         await self._start_ws_client()
         await self._deliver_spool()
+
+        _janitor_task: Task = self._loop.create_task(self._janitor())
+        self._background_tasks.add(_janitor_task)
+        _janitor_task.add_done_callback(self._background_tasks.discard)
 
     async def _start_ws_client(self):
         self._ws_runner = Thread(target=self._ws_connector, daemon=True)
@@ -676,6 +684,20 @@ class DTN7Backend(Backend):
         email_name, email_domain = from_.rsplit(sep="@", maxsplit=1)
         # note: node id gets returned as string with trailing backslash: dtn://<NODEID>/
         return f"{node_id}mail/{email_domain}/{email_name}"
+
+    async def _janitor(self) -> None:
+        """continuous task that expires articles in database"""
+        while True:
+            self.logger.debug("Janitor task reporting for duty")
+
+            if config["usenet"]["expiry_time"] != 0:
+                del_nr: int = await _delete_expired_articles()
+                self.logger.debug(f"Found and deleted {del_nr} expired articles")
+
+            self.logger.debug(
+                f"Janitor task going to sleep for {config['janitor']['sleep'] / 1000} seconds"
+            )
+            await asyncio.sleep(config["janitor"]["sleep"] / 1000)
 
     @property
     def available_commands(self) -> List[str]:

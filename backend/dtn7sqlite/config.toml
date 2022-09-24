@@ -16,12 +16,12 @@ reconnection_pause = 300
 constant_wait = 0.75
 
 [bundles]
-lifetime = "1s" # check backend README for formatting rules
+lifetime = "1s"  # check backend README for formatting rules
 delivery_notification = false
 compress_body = true
 
 [usenet]
-expiry_time = 86400000   # ms make human readable
+expiry_time = "28d"  # check backend README for formatting rules, 0 for no expiry
 email = "t.e.schmitt@posteo.de"
 newsgroups = [
     "monntpy.dev",
@@ -30,3 +30,6 @@ newsgroups = [
     "monntpy.users.uni-frankfurt",
     "monntpy.users.jlu-giessen",
 ]
+
+[janitor]
+sleep = "5m"
