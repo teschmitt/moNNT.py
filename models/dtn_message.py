@@ -17,3 +17,6 @@ class DTNMessage(Model):
     error_log = fields.TextField(null=True)
     hash = fields.CharField(max_length=64, null=False)
     created_at = fields.DatetimeField(auto_now_add=True, null=False)
+
+    class Meta:
+        table = "dtn_spool"
