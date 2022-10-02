@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from asyncio import AbstractEventLoop
 from logging import Logger
 from typing import TYPE_CHECKING, List
 
@@ -13,7 +12,7 @@ class Backend(ABC):
     logger: Logger
     server: "AsyncNNTPServer"
 
-    def __init__(self, server: "AsyncNNTPServer", loop: AbstractEventLoop):
+    def __init__(self, server: "AsyncNNTPServer"):  # , loop: AbstractEventLoop):
         self.logger = global_logger()
         self.server = server
 

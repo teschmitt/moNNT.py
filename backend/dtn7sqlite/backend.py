@@ -1,7 +1,7 @@
 import asyncio
 import time
 import zlib
-from asyncio import AbstractEventLoop, Task
+from asyncio import Task
 from collections import defaultdict
 from datetime import datetime
 from threading import Thread
@@ -49,6 +49,7 @@ from backend.dtn7sqlite.nntp_commands import (
     quit_,
 )
 from backend.dtn7sqlite.utils import (
+    _bp7sender_to_nntpfrom,
     _bundleid_to_messageid,
     _delete_expired_articles,
     get_article_hash,
@@ -57,13 +58,6 @@ from models import Article, DTNMessage, Newsgroup
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
-
-
-def _bp7sender_to_nntpfrom(sender: str) -> str:
-    if not sender.startswith("//") and not sender.startswith("dtn://"):
-        raise ValueError(f"'{sender}' does not seem to be a valid DTN identifier")
-    sender_data: List[str] = sender.replace("dtn://", "").replace("//", "").split("/")
-    return f"{sender_data[-1]}@{sender_data[-2]}"
 
 
 class DTN7Backend(Backend):
@@ -101,8 +95,8 @@ class DTN7Backend(Backend):
     _newsgroups: Dict
     _background_tasks: Set[Task]
 
-    def __init__(self, server: "AsyncNNTPServer", loop: AbstractEventLoop):
-        super().__init__(server=server, loop=loop)
+    def __init__(self, server: "AsyncNNTPServer"):  # , loop: AbstractEventLoop):
+        super().__init__(server=server)  # , loop=loop)
 
         # Connect to db
         """
@@ -112,7 +106,7 @@ class DTN7Backend(Backend):
         gracefully if it can't be established.
         """
         run_async(self._init_db())
-        self._loop = loop  # asyncio.new_event_loop()
+        self._loop = asyncio.new_event_loop()  # loop
         self._newsgroups = {}
         self._group_names = []
         self._background_tasks = set()
@@ -176,18 +170,12 @@ class DTN7Backend(Backend):
         Gets all spooled messages from the DB and (re)sends them to the DTNd. In here, we assume all
         connections to the DTNd are alive and healthy, so we do only minimal error recovery.
         """
-        self.logger.debug("Getting spooled msgs")
         msgs: List[dict] = await DTNMessage.all().values(
             "source", "destination", "data", "hash", "delivery_notification", "lifetime"
         )
 
         while self._ws_client is None or not self._ws_client.running:
             await asyncio.sleep(config["backoff"]["constant_wait"])
-
-        # in case of compression, the data["body"] field has to be decoded and decompressed
-        # for msg in msgs:
-        #     if msg["data"].get("compressed", False):
-        #         msg["data"]["body"] = base64.b64decode(msg["data"]["body"])
 
         self.logger.info(f"Sending {len(msgs)} spooled messages to DTNd")
         await asyncio.gather(
@@ -217,10 +205,13 @@ class DTN7Backend(Backend):
                    difficulties connecting with dtnd
         """
         try:
-            self.logger.debug(f"Sending article to DTNd with {dtn_args}")
+            self.logger.info(
+                f"Sending article '{dtn_payload['subject']}' to DTNd endpoint"
+                f" {dtn_args['destination']}"
+            )
             if self._ws_client is not None:
-                self.logger.debug(f"Sending dtn_args: {dtn_args}")
-                self.logger.debug(f"Sending dtn_payload: {dtn_payload}")
+                # self.logger.debug(f"Sending dtn_args: {dtn_args}")
+                # self.logger.debug(f"Sending dtn_payload: {dtn_payload}")
                 self._ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
             else:
                 raise ConnectionError(
@@ -230,6 +221,10 @@ class DTN7Backend(Backend):
         except Exception as e:  # noqa E722
             # log failure in spool entry
             try:
+                self.logger.debug(
+                    "Not able to contact WS endpoint, logging error to spooled article with hash"
+                    f" {hash_}"
+                )
                 msg: DTNMessage = await DTNMessage.get_or_none(hash=hash_)
                 if msg.error_log is None:
                     msg.error_log = ""
@@ -452,7 +447,7 @@ class DTN7Backend(Backend):
         # self._background_tasks.add(send_task)
         # send_task.add_done_callback(self._background_tasks.discard)
         await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
-        self.logger.debug(f"Done sending message {dtn_msg.id} to dtnd")
+        # self.logger.debug(f"Done sending spooled message {dtn_msg.id} to dtnd")
 
     async def _init_db(self) -> None:
         await Tortoise.init(db_url=config["backend"]["db_url"], modules={"models": ["models"]})
@@ -483,12 +478,15 @@ class DTN7Backend(Backend):
                     callback=self._ws_data_handler,
                     endpoints=[f"dtn://{gn}/~news" for gn in self._group_names],
                 )
+                self.logger.debug(
+                    f"WS connection established. Subscribed to: {[gn for gn in self._group_names]}"
+                )
             except ConnectionError as e:
                 retries += 1
                 self.logger.warning(e)
                 if retries <= max_retries:
                     self.logger.warning(
-                        "Connection to DTNd not possible, retrying after"
+                        "WS-Connection to DTNd not possible, retrying after"
                         f" {(retries ** 2) * initial_wait} seconds."
                     )
                 else:
@@ -641,7 +639,10 @@ class DTN7Backend(Backend):
                 body=msg_data["body"],
                 references=msg_data["references"],
             )
-            self.logger.debug(f"Created new entry with id {msg.id} in articles table")
+            self.logger.info(
+                f"Created new entry with id {msg.id} in articles table, subject:"
+                f" '{msg_data['subject']}'"
+            )
         except IntegrityError as e:
             self.logger.error(
                 f"Got IntegrityError from ORM: {e.__str__()}. No new article entry was created for"
@@ -659,9 +660,11 @@ class DTN7Backend(Backend):
             )
             del_cnt: int = await DTNMessage.filter(hash=article_hash).delete()
             if del_cnt == 1:
-                self.logger.debug("Successful, removed spool entry")
+                self.logger.info(f"Removed spool entry {article_hash}")
             elif del_cnt == 0:
-                self.logger.debug("Article seems to have remote origin, no spool entry removed.")
+                self.logger.debug(
+                    f"Article seems to have remote origin, no spool entry removed for {msg_id}."
+                )
             else:
                 self.logger.error(
                     f"Something went wrong deleting the entry. {del_cnt} entries were deleted"

@@ -52,6 +52,7 @@ class ClientConnection:
 
         # main execution loop for handling a connection until it's closed
         while not self._terminated:
+            # while True:
             try:
                 # TODO: make timeout a setting
                 incoming_data = await wait_for(self._reader.readline(), timeout=43200.0)

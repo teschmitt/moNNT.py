@@ -30,3 +30,10 @@ async def _delete_expired_articles() -> int:
         milliseconds=config["usenet"]["expiry_time"]
     )
     return await Article.filter(created_at__lt=cutoff_dt).delete()
+
+
+def _bp7sender_to_nntpfrom(sender: str) -> str:
+    if not sender.startswith("//") and not sender.startswith("dtn://"):
+        raise ValueError(f"'{sender}' does not seem to be a valid DTN identifier")
+    sender_data: List[str] = sender.replace("dtn://", "").replace("//", "").split("/")
+    return f"{sender_data[-1]}@{sender_data[-2]}"

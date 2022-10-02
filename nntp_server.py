@@ -45,9 +45,9 @@ class AsyncNNTPServer:
         self.clients[task] = (reader, writer)
 
         def client_done(tsk: asyncio.Task):
+            self.logger.info("Discarding connection")
             self.clients[tsk].stop()
             del self.clients[tsk]
-            self.logger.info("End Connection")
 
         task.add_done_callback(client_done)
 
