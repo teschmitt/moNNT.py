@@ -1,10 +1,8 @@
 import asyncio
-import time
 import zlib
 from asyncio import AbstractEventLoop, Task
 from collections import defaultdict
 from datetime import datetime
-from threading import Thread
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -14,12 +12,12 @@ from typing import (
     List,
     Optional,
     Set,
-    Union,
 )
 
 import cbor2
+import websockets
 from cbor2 import CBORDecodeEOF
-from py_dtn7 import Bundle, DTNRESTClient, DTNWSClient, from_dtn_timestamp
+from py_dtn7 import Bundle, DTNRESTClient, from_dtn_timestamp
 from requests.exceptions import ConnectionError
 from tortoise import Tortoise, run_async
 from tortoise.exceptions import IntegrityError, OperationalError
@@ -53,6 +51,7 @@ from backend.dtn7sqlite.utils import (
     _bundleid_to_messageid,
     _delete_expired_articles,
     get_article_hash,
+    group_name_to_endpoint,
 )
 from models import Article, DTNMessage, Newsgroup
 
@@ -89,14 +88,13 @@ class DTN7Backend(Backend):
     _group_names: List[str]
     # _ready_to_send: bool
     _rest_client: Optional[DTNRESTClient]
-    _ws_client: Optional[DTNWSClient]
-    _ws_runner: Optional[Thread]
+    _ws_client: Optional[websockets.WebSocketClientProtocol]
     _loop: AbstractEventLoop
     _newsgroups: Dict
     _background_tasks: Set[Task]
 
-    def __init__(self, server: "AsyncNNTPServer"):  # , loop: AbstractEventLoop):
-        super().__init__(server=server)  # , loop=loop)
+    def __init__(self, server: "AsyncNNTPServer", loop: AbstractEventLoop):
+        super().__init__(server=server, loop=loop)
 
         # Connect to db
         """
@@ -106,18 +104,16 @@ class DTN7Backend(Backend):
         gracefully if it can't be established.
         """
         run_async(self._init_db())
-        self._loop = asyncio.new_event_loop()  # loop
+        self._loop = loop
         self._newsgroups = {}
         self._group_names = []
         self._background_tasks = set()
 
         self._rest_client = None
         self._ws_client = None
-        self._ws_runner = None
 
     def stop(self) -> None:
         self.logger.info("Stopping DTN7Backend")
-        self._ws_runner.join(timeout=config["backoff"]["constant_wait"])
         self._loop.stop()
         self._loop.close()
 
@@ -152,18 +148,18 @@ class DTN7Backend(Backend):
         # execute the WS connector in a new thread
         # asyncio.new_event_loop().run_until_complete(self._ws_connector())
         # self._ws_runner = asyncio.create_task(self._ws_connector())
-
         await self._ingest_all_from_dtnd()
-        await self._start_ws_client()
-        await self._deliver_spool()
 
         _janitor_task: Task = self._loop.create_task(self._janitor())
-        self._background_tasks.add(_janitor_task)
-        _janitor_task.add_done_callback(self._background_tasks.discard)
+        _ws_connector_task: Task = self._loop.create_task(self._ws_connector())
 
-    async def _start_ws_client(self):
-        self._ws_runner = Thread(target=self._ws_connector, daemon=True)
-        self._ws_runner.start()
+        self._background_tasks.add(_janitor_task)
+        self._background_tasks.add(_ws_connector_task)
+
+        _janitor_task.add_done_callback(self._background_tasks.discard)
+        _ws_connector_task.add_done_callback(self._background_tasks.discard)
+
+        await self._deliver_spool()
 
     async def _deliver_spool(self) -> None:
         """
@@ -174,7 +170,7 @@ class DTN7Backend(Backend):
             "source", "destination", "data", "hash", "delivery_notification", "lifetime"
         )
 
-        while self._ws_client is None or not self._ws_client.running:
+        while self._ws_client is None:
             await asyncio.sleep(config["backoff"]["constant_wait"])
 
         self.logger.info(f"Sending {len(msgs)} spooled messages to DTNd")
@@ -210,9 +206,16 @@ class DTN7Backend(Backend):
                 f" {dtn_args['destination']}"
             )
             if self._ws_client is not None:
-                # self.logger.debug(f"Sending dtn_args: {dtn_args}")
-                # self.logger.debug(f"Sending dtn_payload: {dtn_payload}")
-                self._ws_client.send_data(**dtn_args, data=cbor2.dumps(dtn_payload))
+                payload: bytes = cbor2.dumps(
+                    {
+                        "src": dtn_args["source"],
+                        "dst": dtn_args["destination"],
+                        "delivery_notification": dtn_args["delivery_notification"],
+                        "lifetime": dtn_args["lifetime"],
+                        "data": cbor2.dumps(dtn_payload),
+                    }
+                )
+                await self._ws_client.send(payload)
             else:
                 raise ConnectionError(
                     "No current connection to WS client. Article is in spool and will be sent on"
@@ -456,63 +459,81 @@ class DTN7Backend(Backend):
 
         self.logger.info(f"Connected to database {config['backend']['db_url']}")
 
-    def _ws_connector(self) -> None:
+    async def _ws_connector(self) -> None:
         """
         Must be run in a Thread and will keep a WS-connection open for as long as the
         server lives. Reconnects automatically when the connection drops and uses exponential
         backoff to pace reconnection attempts
         """
-        retries: int = 0
-        initial_wait: float = config["backoff"]["initial_wait"]
-        max_retries: int = config["backoff"]["max_retries"]
-        reconnection_pause: int = config["backoff"]["reconnection_pause"]
 
         self.logger.debug("Setting up WS connection to dtnd")
 
-        while not self.server.terminated:
-            # naive exponential backoff implementation
-            time.sleep((retries**2) * initial_wait)
-            # register and subscribe to all newsgroup endpoints
+        async for self._ws_client in websockets.connect(
+            "ws://localhost:3000/ws", ping_timeout=None
+        ):
             try:
-                self._ws_client = DTNWSClient(
-                    callback=self._ws_data_handler,
-                    endpoints=[f"dtn://{gn}/~news" for gn in self._group_names],
-                )
+                await self._ws_client.send("/data")
+                for gn in self._group_names:
+                    await self._ws_client.send(f"/subscribe {group_name_to_endpoint(gn)}")
                 self.logger.debug(
                     f"WS connection established. Subscribed to: {[gn for gn in self._group_names]}"
                 )
-            except ConnectionError as e:
-                retries += 1
+
+                ####################################################################################
+                async for ws_data in self._ws_client:
+                    if isinstance(ws_data, str):
+                        self.logger.debug(
+                            "Received WebSocket data from DTNd, probably a status message:"
+                            f" {ws_data}"
+                        )
+                        # probably a status code, so check if it's an error that should be logged
+                        if ws_data.startswith("4"):
+                            self.logger.info(f"User caused an error: {ws_data}")
+                        if ws_data.startswith("5"):
+                            self.logger.error(f"Server-side error: {ws_data}")
+
+                    elif isinstance(ws_data, bytes):
+                        self.logger.debug(
+                            "Received WebSocket data from DTNd. Data determined to by bytes."
+                        )
+                        try:
+                            ws_dict: dict = cbor2.loads(ws_data)
+                        except (CBORDecodeEOF, MemoryError) as e:
+                            err: RuntimeError = RuntimeError(
+                                "Something went wrong decoding a CBOR data object. Any intended"
+                                f" save operation will fail on account of this error: {e}"
+                            )
+                            self.logger.exception(err)
+                            raise err
+
+                        try:
+                            self.logger.debug("Starting data handler.")
+
+                            _handle_task: Task = self._loop.create_task(
+                                self._handle_backchannel_data(ws_struct=ws_dict)
+                            )
+                            self._background_tasks.add(_handle_task)
+                            _handle_task.add_done_callback(self._background_tasks.discard)
+                            # await self._handle_backchannel_data(ws_struct=ws_dict)
+
+                            # solve latency issues with a queue!
+                            # https://stackoverflow.com/a/52615705
+
+                        except Exception as e:  # noqa E722
+                            self.logger.exception(e)
+                            self.logger.warning(
+                                "Ignoring the previous error and continuing processing."
+                            )
+                            # raise Exception(e)
+
+                    else:
+                        raise ValueError("Handler received unrecognizable data.")
+                    ################################################################################
+
+            except (OSError, ConnectionError, websockets.ConnectionClosed) as e:
                 self.logger.warning(e)
-                if retries <= max_retries:
-                    self.logger.warning(
-                        "WS-Connection to DTNd not possible, retrying after"
-                        f" {(retries ** 2) * initial_wait} seconds."
-                    )
-                else:
-                    self.logger.error(
-                        "DTNd seems permanently down. Articles will be saved to spool and sent"
-                        " upon reconnection. Reconnection attempts paused for"
-                        f" {reconnection_pause} seconds."
-                    )
-                    time.sleep(reconnection_pause)
-                    retries = 0
-                    self.logger.info("Restarting reconnection attempts with DTNd.")
+                self.logger.warning("WS-Connection to DTNd not possible, will retry ...")
                 continue
-
-            retries = 0
-            self._ws_client.start_client()
-
-            # this will run only when start_client() returns/connection is lost.
-            self._ws_client.stop_client()
-            # we need to reconnect to REST interface and re-register all newsgroups
-            # before we can try reconnecting to the WS interface
-            self._rest_client = None
-            self._ws_client = None
-            self._loop.run_until_complete(self._rest_connector())
-            # await self._rest_connector()
-
-        self.logger.info("Permanently stopped backend (WebSocket Client)")
 
     async def _rest_connector(self) -> None:
         # TODO: in the backend object, install a periodic task that checks to see of the REST
@@ -552,57 +573,6 @@ class DTN7Backend(Backend):
             else:
                 # register all groups with the DTNd backend.
                 await self._register_all_groups()
-
-    def _ws_data_handler(self, ws_data: Union[str, bytes]) -> None:
-        """
-        This gets called when data gets sent over the WebSockets connection from remote.
-        In cases where an article has been sent over to the DTNd, the DTNd will return a
-        struct with lots of handy information we can use to persist the article in our
-        local DB, so we scrape all that meaningful DTN-data out of the returned struct and
-        let the ORM handle the rest
-
-        Args:
-            ws_data: data sent from the DTNd over the Websockets connection
-        """
-        self._loop.run_until_complete(self._async_ws_data_handler(ws_data))
-        # dh_task: Task = self._loop.create_task(self._async_ws_data_handler(ws_data))
-        # self._background_tasks.add(dh_task)
-        # dh_task.add_done_callback(self._background_tasks.discard)
-
-    async def _async_ws_data_handler(self, ws_data: Union[str, bytes]) -> None:
-        if isinstance(ws_data, str):
-            self.logger.debug(
-                f"Received WebSocket data from DTNd, probably a status message: {ws_data}"
-            )
-            # probably a status code, so check if it's an error that should be logged
-            if ws_data.startswith("4"):
-                self.logger.info(f"User caused an error: {ws_data}")
-            if ws_data.startswith("5"):
-                self.logger.error(f"Server-side error: {ws_data}")
-
-        elif isinstance(ws_data, bytes):
-            self.logger.debug("Received WebSocket data from DTNd. Data determined to by bytes.")
-            try:
-                ws_dict: dict = cbor2.loads(ws_data)
-                # self.logger.debug(f"Data dict: {ws_dict}")
-            except (CBORDecodeEOF, MemoryError) as e:
-                err: RuntimeError = RuntimeError(
-                    "Something went wrong decoding a CBOR data object. Any intended save operation "
-                    f"will fail on account of this error: {e}"
-                )
-                self.logger.exception(err)
-                raise err
-
-            try:
-                self.logger.debug("Starting data handler.")
-                await self._handle_backchannel_data(ws_struct=ws_dict)
-            except Exception as e:  # noqa E722
-                self.logger.exception(e)
-                self.logger.warning("Ignoring the previous error and continuing processing.")
-                # raise Exception(e)
-
-        else:
-            raise ValueError("Handler received unrecognizable data.")
 
     async def _handle_backchannel_data(self, ws_struct: dict):
         self.logger.debug("Mapping BP7 to NNTP fields")

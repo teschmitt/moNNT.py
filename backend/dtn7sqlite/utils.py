@@ -37,3 +37,7 @@ def _bp7sender_to_nntpfrom(sender: str) -> str:
         raise ValueError(f"'{sender}' does not seem to be a valid DTN identifier")
     sender_data: List[str] = sender.replace("dtn://", "").replace("//", "").split("/")
     return f"{sender_data[-1]}@{sender_data[-2]}"
+
+
+def group_name_to_endpoint(group_name: str):
+    return f"dtn://{group_name}/~news"
