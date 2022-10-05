@@ -1,7 +1,7 @@
 import asyncio
 import time
 import zlib
-from asyncio import Task
+from asyncio import AbstractEventLoop, Task
 from collections import defaultdict
 from datetime import datetime
 from threading import Thread
@@ -87,11 +87,11 @@ class DTN7Backend(Backend):
     }
 
     _group_names: List[str]
-    _ready_to_send: bool
+    # _ready_to_send: bool
     _rest_client: Optional[DTNRESTClient]
     _ws_client: Optional[DTNWSClient]
     _ws_runner: Optional[Thread]
-    # _loop: AbstractEventLoop
+    _loop: AbstractEventLoop
     _newsgroups: Dict
     _background_tasks: Set[Task]
 
