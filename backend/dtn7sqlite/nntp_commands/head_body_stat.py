@@ -39,7 +39,7 @@ async def do_head_body_stat(client_conn: "ClientConnection") -> Union[List[str],
     if client_conn.command == "head":
         res[0] = StatusCodes.STATUS_HEAD.substitute(number=num, message_id=msg_id)
         res = res[:last_header_line]
-    if client_conn.command == "stat":
+    elif client_conn.command == "stat":
         res = StatusCodes.STATUS_STAT.substitute(number=num, message_id=msg_id)
     else:
         last_header_line += 1
