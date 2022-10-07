@@ -146,12 +146,12 @@ class DTN7Backend(Backend):
         await self._rest_connector()
 
         # execute the WS connector in a new thread
-        # asyncio.new_event_loop().run_until_complete(self._ws_connector())
-        # self._ws_runner = asyncio.create_task(self._ws_connector())
+        # asyncio.new_event_loop().run_until_complete(self._ws_runner())
+        # self._ws_runner = asyncio.create_task(self._ws_runner())
         await self._ingest_all_from_dtnd()
 
         _janitor_task: Task = self._loop.create_task(self._janitor())
-        _ws_connector_task: Task = self._loop.create_task(self._ws_connector())
+        _ws_connector_task: Task = self._loop.create_task(self._ws_runner())
 
         self._background_tasks.add(_janitor_task)
         self._background_tasks.add(_ws_connector_task)
@@ -174,21 +174,34 @@ class DTN7Backend(Backend):
             await asyncio.sleep(config["backoff"]["constant_wait"])
 
         self.logger.info(f"Sending {len(msgs)} spooled messages to DTNd")
-        await asyncio.gather(
-            *(
-                self._send_to_dtnd(
-                    dtn_args={
-                        "destination": msg["destination"],
-                        "source": msg["source"],
-                        "delivery_notification": msg["delivery_notification"],
-                        "lifetime": msg["lifetime"],
-                    },
-                    dtn_payload=msg["data"],
-                    hash_=msg["hash"],
-                )
-                for msg in msgs
+        # await asyncio.gather(
+        #     *(
+        #         self._send_to_dtnd(
+        #             dtn_args={
+        #                 "destination": msg["destination"],
+        #                 "source": msg["source"],
+        #                 "delivery_notification": msg["delivery_notification"],
+        #                 "lifetime": msg["lifetime"],
+        #             },
+        #             dtn_payload=msg["data"]
+        #             hash_=msg["hash"],
+        #         )
+        #         for msg in msgs
+        #     )
+        # )
+        for msg in msgs:
+            await self._send_to_dtnd(
+                dtn_args={
+                    "destination": msg["destination"],
+                    "source": msg["source"],
+                    "delivery_notification": msg["delivery_notification"],
+                    "lifetime": msg["lifetime"],
+                },
+                dtn_payload=msg["data"],
+                hash_=msg["hash"],
             )
-        )
+            await asyncio.sleep(0.0001)
+
         self.logger.info(f"Done sending {len(msgs)} spooled messages to DTNd")
 
     async def _send_to_dtnd(self, dtn_args: dict, dtn_payload: dict, hash_: str):
@@ -459,7 +472,7 @@ class DTN7Backend(Backend):
 
         self.logger.info(f"Connected to database {config['backend']['db_url']}")
 
-    async def _ws_connector(self) -> None:
+    async def _ws_runner(self) -> None:
         """
         Must be run in a Thread and will keep a WS-connection open for as long as the
         server lives. Reconnects automatically when the connection drops and uses exponential
@@ -508,7 +521,6 @@ class DTN7Backend(Backend):
 
                         try:
                             self.logger.debug("Starting data handler.")
-
                             _handle_task: Task = self._loop.create_task(
                                 self._handle_backchannel_data(ws_struct=ws_dict)
                             )
@@ -562,8 +574,13 @@ class DTN7Backend(Backend):
                 self.logger.debug("Successfully contacted REST interface")
             except ConnectionError:
                 if retries >= max_retries:
-                    self.logger.error("DTNd REST interface not available, not trying again")
-                    break
+                    self.logger.error(
+                        "DTNd REST interface not available, retrying in"
+                        f" {config['backoff']['reconnection_pause']} seconds."
+                    )
+                    await asyncio.sleep(config["backoff"]["reconnection_pause"])
+                    retries = 0
+
                 new_sleep: int = (retries**2) * initial_wait
                 self.logger.debug(
                     f"DTNd REST interface not available, waiting for {new_sleep} seconds"
