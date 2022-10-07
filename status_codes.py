@@ -48,14 +48,18 @@ class StatusCodes:
     STATUS_XPAT: str = "221 Header follows"
 
     # string templates
-    ERR_TIMEOUT: str = "503 Timeout after %s seconds, closing connection."
-    STATUS_ARTICLE: str = "220 %s %s All of the article follows"
+    ERR_TIMEOUT: Template = Template("503 Timeout after %seconds seconds, closing connection.")
+    STATUS_ARTICLE: Template = Template("220 $number $message_id All of the article follows")
     STATUS_NEXTLAST: Template = Template("223 $number $message_id Article found")
     STATUS_BODY: Template = Template("222 $number $message_id article retrieved - body follows")
     STATUS_DATE: Template = Template("111 $date")
     STATUS_GROUPSELECTED: Template = Template("211 $count $first $last $name group selected")
     STATUS_HEAD: Template = Template("221 $number $message_id article retrieved - head follows")
     STATUS_LISTGROUP: Template = Template("211 $number $low $high $group")
-    STATUS_READYNOPOST: str = "201 %s moNNT.py %s server ready (no posting allowed)"
-    STATUS_READYOKPOST: str = "200 %s moNNT.py %s server ready (posting allowed)"
+    STATUS_READYNOPOST: Template = Template(
+        "200 $url moNNT.py $version server ready (no posting allowed)"
+    )
+    STATUS_READYOKPOST: Template = Template(
+        "200 $url moNNT.py $version server ready (posting allowed)"
+    )
     STATUS_STAT: Template = Template("223 $number $message_id Article exists")

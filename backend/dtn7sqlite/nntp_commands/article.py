@@ -85,9 +85,8 @@ async def do_article(client_conn: "ClientConnection") -> Union[List[str], str]:
     group_name: str = (await msg.newsgroup).name
 
     try:
-        response_status = StatusCodes.STATUS_ARTICLE % (
-            msg.id,
-            msg.message_id,
+        response_status = StatusCodes.STATUS_ARTICLE.substitute(
+            number=msg.id, message_id=msg.message_id
         )
     except AttributeError:
         return StatusCodes.ERR_NOSUCHARTICLENUM

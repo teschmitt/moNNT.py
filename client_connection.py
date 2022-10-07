@@ -40,14 +40,16 @@ class ClientConnection:
         if server_config["server_type"] == "read-only":
             self._server.send(
                 writer=self._writer,
-                send_obj=StatusCodes.STATUS_READYNOPOST
-                % (server_config["nntp_hostname"], get_version()),
+                send_obj=StatusCodes.STATUS_READYNOPOST.substitute(
+                    url=server_config["nntp_hostname"], version=get_version()
+                ),
             )
         else:
             self._server.send(
                 writer=self._writer,
-                send_obj=StatusCodes.STATUS_READYOKPOST
-                % (server_config["nntp_hostname"], get_version()),
+                send_obj=StatusCodes.STATUS_READYOKPOST.substitute(
+                    url=server_config["nntp_hostname"], version=get_version()
+                ),
             )
 
         # main execution loop for handling a connection until it's closed
