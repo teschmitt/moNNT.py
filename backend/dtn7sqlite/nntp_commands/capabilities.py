@@ -20,6 +20,7 @@ async def do_capabilities(_):
         f"IMPLEMENTATION moNNT.py Async Usenet Server v{get_version()}",
         "LIST ACTIVE NEWSGROUPS OVERVIEW.FMT SUBSCRIPTIONS",
         "OVER MSGID",
+        "POST",
         "HDR",
         "READER",
     ]
