@@ -29,6 +29,8 @@ async def do_head_body_stat(client_conn: "ClientConnection") -> Union[List[str],
     res = await do_article(client_conn)
 
     # pipe through any errors:
+    if isinstance(res, str):
+        return res
     status, num, msg_id, _ = res[0].split(" ", 3)
     if status[0] != "2":
         return res

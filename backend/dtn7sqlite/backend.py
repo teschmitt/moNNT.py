@@ -174,21 +174,7 @@ class DTN7Backend(Backend):
             await asyncio.sleep(config["backoff"]["constant_wait"])
 
         self.logger.info(f"Sending {len(msgs)} spooled messages to DTNd")
-        # await asyncio.gather(
-        #     *(
-        #         self._send_to_dtnd(
-        #             dtn_args={
-        #                 "destination": msg["destination"],
-        #                 "source": msg["source"],
-        #                 "delivery_notification": msg["delivery_notification"],
-        #                 "lifetime": msg["lifetime"],
-        #             },
-        #             dtn_payload=msg["data"]
-        #             hash_=msg["hash"],
-        #         )
-        #         for msg in msgs
-        #     )
-        # )
+
         for msg in msgs:
             await self._send_to_dtnd(
                 dtn_args={
@@ -218,6 +204,12 @@ class DTN7Backend(Backend):
                 f"Sending article '{dtn_payload['subject']}' to DTNd endpoint"
                 f" {dtn_args['destination']}"
             )
+
+            if config["bundles"]["compress_body"]:
+                self.logger.debug("Compression is turned on, compressing body with zlib")
+                dtn_payload["compressed"] = True
+                dtn_payload["body"] = zlib.compress(dtn_payload["body"].encode())
+
             if self._ws_client is not None:
                 payload: bytes = cbor2.dumps(
                     {
@@ -260,13 +252,13 @@ class DTN7Backend(Backend):
         :return: None
         """
         for group_name in self._group_names:
-            self.logger.debug(f"Registering endpoint with REST client: dtn://{group_name}/~news")
+            self.logger.info(f"Registering endpoint with REST client: dtn://{group_name}/~news")
             self._rest_client.register(endpoint=f"dtn://{group_name}/~news")
 
         # also register the email address of sender, so we get info on sent
         # articles through WebSocket back channel
-        sender_endpoint: str = self._nntpfrom_to_bp7sender(config["usenet"]["email"])
-        self.logger.debug(f"Registering WS back-channel: {sender_endpoint}")
+        sender_endpoint: str = self._nntpfrom_to_bp7source(config["usenet"]["email"])
+        self.logger.info(f"Registering WS back-channel: {sender_endpoint}")
         self._rest_client.register(endpoint=sender_endpoint)
 
     async def _ingest_all_from_dtnd(self) -> None:
@@ -410,16 +402,17 @@ class DTN7Backend(Backend):
         dtn_payload: dict = {
             "subject": header["subject"],
             "references": header["references"],
+            "body": body
             # disregarded headers (some are mapped to BP7 fields, some are reconstructed later when
             # the article has been sent to the dtnd, some are dropped entirely:
             # newsgroup, from, created_at, message_id, path, reply_to, organization, user_agent
         }
-        if config["bundles"]["compress_body"]:
-            self.logger.debug("Compression is turned on, compressing body with zlib")
-            dtn_payload["compressed"] = True
-            dtn_payload["body"] = zlib.compress(body.encode())
-        else:
-            dtn_payload["body"] = body
+        # if config["bundles"]["compress_body"]:
+        #     self.logger.debug("Compression is turned on, compressing body with zlib")
+        #     dtn_payload["compressed"] = True
+        #     dtn_payload["body"] = zlib.compress(body.encode())
+        # else:
+        #     dtn_payload["body"] = body
 
         # sender email address is defined through backend config, so we don't need to parse it from
         # the incoming data:
@@ -431,10 +424,8 @@ class DTN7Backend(Backend):
         #     self.logger.warning(f"Email address could not be parsed: {e}")
         #     sender_email: str = "not-recognized@email-address.net"
         sender_email = config["usenet"]["email"]
-        source: str = self._nntpfrom_to_bp7sender(from_=sender_email)
-        # TODO: get lifetime, destination settings from settings:
+        source: str = self._nntpfrom_to_bp7source(from_=sender_email)
         dtn_args: dict = {
-            # map NNTP to BP7 MAPPING
             "source": source,
             "destination": f"dtn://{group_name}/~news",
             "delivery_notification": config["bundles"]["delivery_notification"],
@@ -443,16 +434,16 @@ class DTN7Backend(Backend):
 
         # in case the body is compressed we need to fetch the textform body in order to insert it
         # into the DB since the payload field has a JSON type and will not accept byte type data
-        spool_payload: dict = dtn_payload.copy()
-        if config["bundles"]["compress_body"]:
-            spool_payload["body"] = body
+        # spool_payload: dict = dtn_payload.copy()
+        # if config["bundles"]["compress_body"]:
+        #     spool_payload["body"] = body
         # HASHING
         message_hash = get_article_hash(
-            source=dtn_args["source"], destination=dtn_args["destination"], data=spool_payload
+            source=dtn_args["source"], destination=dtn_args["destination"], data=dtn_payload
         )
         self.logger.debug(f"Sending article to DB, got message hash: {message_hash}")
         dtn_msg: DTNMessage = await DTNMessage.create(
-            **dtn_args, data=spool_payload, hash=message_hash
+            **dtn_args, data=dtn_payload, hash=message_hash
         )
         self.logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
         self.logger.debug(f"Sending message {dtn_msg.id} to dtnd")
@@ -488,7 +479,7 @@ class DTN7Backend(Backend):
                 await self._ws_client.send("/data")
                 for gn in self._group_names:
                     await self._ws_client.send(f"/subscribe {group_name_to_endpoint(gn)}")
-                self.logger.debug(
+                self.logger.info(
                     f"WS connection established. Subscribed to: {[gn for gn in self._group_names]}"
                 )
 
@@ -571,7 +562,7 @@ class DTN7Backend(Backend):
             self.logger.debug("Contacting DTNs REST interface")
             try:
                 self._rest_client = DTNRESTClient(host=host, port=port)
-                self.logger.debug("Successfully contacted REST interface")
+                self.logger.info("Successfully contacted REST interface")
             except ConnectionError:
                 if retries >= max_retries:
                     self.logger.error(
@@ -582,7 +573,7 @@ class DTN7Backend(Backend):
                     retries = 0
 
                 new_sleep: int = (retries**2) * initial_wait
-                self.logger.debug(
+                self.logger.warning(
                     f"DTNd REST interface not available, waiting for {new_sleep} seconds"
                 )
                 await asyncio.sleep(new_sleep)
@@ -614,8 +605,9 @@ class DTN7Backend(Backend):
         # TODO: Error handling in case group does not exist
 
         if msg_data.get("compressed", False):
+            self.logger.debug(f"BEFORE DECOMPRESSING {msg_data['body']}")
             msg_data["body"] = zlib.decompress(msg_data["body"]).decode()
-
+            self.logger.debug(f"AFTER DECOMPRESSING {msg_data['body']}")
         try:
             msg: Article = await Article.create(
                 newsgroup=article_group,
@@ -635,6 +627,8 @@ class DTN7Backend(Backend):
                 f"Got IntegrityError from ORM: {e.__str__()}. No new article entry was created for"
                 f" article with message-id {msg_id}."
             )
+        except Exception as e:  # noqa E722
+            self.logger.exception(e)
         else:
             # remove message from spool HASHING
             article_hash = get_article_hash(
@@ -658,7 +652,7 @@ class DTN7Backend(Backend):
                     " instead of 1"
                 )
 
-    def _nntpfrom_to_bp7sender(self, from_: str) -> str:
+    def _nntpfrom_to_bp7source(self, from_: str) -> str:
         if "@" not in from_:
             raise ValueError(f"'{from_}' does not seem to be a valid email address")
 

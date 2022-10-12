@@ -24,7 +24,7 @@ config_defaults = {
         "reconnection_pause": 300,
         "constant_wait": 0.75,
     },
-    "bundles": {"lifetime": 86400000, "delivery_notification": False},
+    "bundles": {"lifetime": 86400000, "delivery_notification": False, "compress_body": False},
     "usenet": {
         "expiry_time": 2419200000,
         "email": "none@none.com",
