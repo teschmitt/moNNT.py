@@ -1,0 +1,129 @@
+# Example config file for dtn7 daemon
+
+# FOR MONNT.PY-users: this is mostly copied from the original dtn7-rs
+# repo with a few moNNT.py related changes and comments.
+# Lots of demo options have also been commented out
+# Repo URL: https://github.com/dtn7/dtn7-rs
+
+
+# the name of this node used with dtn naming scheme
+# "node1" becomes "dtn://node1/"
+# FOR MONNT.PY-users: it is absolutely paramount that this node ID is identical to the
+# node ID defined in the backend/dtn7sqlite/config.toml Not keeping them identical can
+# lead to all sorts of unwanted effects including lost bundles
+nodeid = "node1"
+
+# enable/disable debug output in the logs
+debug = false
+
+# Enables advertisement of the beaon period in discovery beacons
+beacon-period = true
+
+# the generation of status reports when requested by bundles
+# can cause massive traffic on the network!
+generate-status-reports = false
+
+# when reprocessing bundles should they be handled sequentially or in parallel?
+# parallel can be faster but may cause congestion on the network
+# sequential is more reliable but slower which can be a problem when nodes are highly mobile
+# and often lose contact with each other
+#
+# sequential is the default
+parallel-bundle-processing = false
+
+# the port on which the web interface listens
+# this provides:
+# - a simple web interface with status information
+# - a REST interface for the dtn7 daemon
+# - a WebSocket interface for the dtn7 daemon
+webport = 3000
+
+# the working directory in which files can be stored
+# workdir = "/tmp/dtn7"
+
+# the database to use for storing bundles, e.g., mem, sled, sneakers, etc.
+db = "mem"
+
+[routing]
+# the routing algorithm to use, e.g., flooding, epidemic, sink, sprayandwait, etc.
+strategy = "epidemic"
+
+# additional parameters for the routing strategy can be set here
+settings.sprayandwait.num_copies = 7
+
+[core]
+# the janitor is responsible for cleaning the bundle buffer
+# and schedule resubmissions.
+# a value of 0 deactives the janitor
+janitor = "10s"
+
+
+[discovery]
+# interval of 0 deactives discovery service
+interval = "2s"
+peer-timeout = "20s"
+
+
+[convergencylayers]
+global.tcp.refuse-existing-bundles = true
+
+cla.0.id = "mtcp"
+cla.0.port = 16162
+
+# cla.1.id = "tcp"
+
+# cla.1.refuse-existing-bundles = true # overrides global option from above
+
+
+# Define user specified discovery targets to send announcement beacons to, if not specified the default targets "224.0.0.26:3003" for IPv4 and "[FF02::1]:3003" will be used
+# If a IPv4 address is specified the IPv4 flag has to be enabled, same goes for specifying an IPv6 address
+# [discovery_destinations]
+#
+# target.0.destination = "224.0.0.27:3004"
+#
+# target.1.destination = "[FF02::1]:3004"
+#
+# target.2.destination = "192.168.178.255"
+
+
+# Define user specified services that will be advertised with discovery beacons
+# Each service takes a u8 tag and a payload value who's content depends on the used tag
+#[services]
+# So far 4 Tags are defined and can be used like this:
+#
+# Tag 63 advertises a custom, unformatted string message
+# service.0.tag = 63
+# service.0.payload = "This is a custom string message"
+#
+# Tag 127 advertises 2 floating point numbers represented as geographical location in latitude/longitude
+# service.1.tag = 127
+# service.1.payload = "52.32 24.42"
+#
+# Tag 191 advertises 1 integer represented as battery level in %
+# service.2.tag = 191
+# service.1.payload = "75"
+#
+# Tag 255 advertises an address represented like this: (Street Number PostalNumber City CountryCode)
+# service.3.tag = 255
+# service.3.payload = "Samplestreet 42 12345 SampleCity SC"
+
+[statics]
+# peers = [
+#     "mtcp://192.168.2.101/testnode",
+#     "mtcp://192.168.2.11/gw1",
+#     "mtcp://127.0.0.1:2342/localcopynode",
+# ]
+
+[endpoints]
+# local endpoints are always reachable under dtn://<nodeid>/<localname>
+# local.0 = "incoming"
+# local.1 = "null"
+
+group.0 = "dtn://hometown/~weather" # atm ignored
+
+# External CLA settings
+# [ecla]
+# If ECLA should be enabled
+# enabled  = false
+# If the TCP Port is not 0 ECLA clients can also connect via TCP to that port
+# tcp_port = 0
