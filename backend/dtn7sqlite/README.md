@@ -1,4 +1,28 @@
-# DTN7-SQLite Backend
+# DTN7SQLite Backend
+
+## Getting Started
+
+To run moNNT.py with this backend in conjunction with the `dtnd`, first start the daemon with the node ID you have
+also defined in the `config.toml`, e.g. like so:
+
+```shell
+$ dtnd --nodeid n1 --cla mtcp
+```
+
+Usually, more arguments are not necessary since this backend will take care of registering all needed endpoints
+through the REST and WebSocket interfaces.
+
+Take a look in the `config.toml` to familiarize yourself with the options. All time related options are first parsed
+by the [`pytimeparse2` package](https://github.com/onegreyonewhite/pytimeparse2) and can therefore be written in a
+human-readable format according to the specifications of that package, e.g.
+
+```
+32m
+2h32m
+3d2h32m
+1w3d2h32m
+1w 3d 2h 32m
+```
 
 
 ## Open Source Packages
