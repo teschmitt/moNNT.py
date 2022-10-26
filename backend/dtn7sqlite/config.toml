@@ -5,7 +5,7 @@ rest_check = "20s"
 # options for contacting the dtnd
 [dtnd]
 # host running the dtnd
-host = "http://127.0.0.1"
+host = "127.0.0.1"
 # port to contact the web services on
 port = 3000
 # node id for this node. It is very (!) important to keep this snyced to the --nodeid argument used to

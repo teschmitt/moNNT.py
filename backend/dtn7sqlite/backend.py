@@ -149,12 +149,13 @@ class DTN7Backend(Backend):
 
         _janitor_task: Task = self._loop.create_task(self._janitor())
         _ws_connector_task: Task = self._loop.create_task(self._ws_runner())
-
+        _rest_connector_task: Task = self._loop.create_task(self._rest_runner())
         self._background_tasks.add(_janitor_task)
         self._background_tasks.add(_ws_connector_task)
-
+        self._background_tasks.add(_rest_connector_task)
         _janitor_task.add_done_callback(self._background_tasks.discard)
         _ws_connector_task.add_done_callback(self._background_tasks.discard)
+        _rest_connector_task.add_done_callback(self._background_tasks.discard)
 
         await self._deliver_spool()
 
@@ -447,12 +448,21 @@ class DTN7Backend(Backend):
         when the connection drops and uses exponential backoff to pace reconnection attempts
         """
 
-        self.logger.debug("Setting up WS connection to dtnd")
+        self.logger.debug(
+            "Setting up WS connection to dtnd:"
+            f" ws://{config['dtnd']['host']}:{config['dtnd']['port']}{config['dtnd']['ws_path']}"
+        )
+        first_connect: bool = True
 
         async for self._ws_client in websockets.connect(
-            "ws://localhost:3000/ws", ping_timeout=None
+            f"ws://{config['dtnd']['host']}:{config['dtnd']['port']}{config['dtnd']['ws_path']}",
+            ping_timeout=None,
         ):
             try:
+                if not first_connect:
+                    await self._register_all_groups()
+                first_connect = False
+
                 await self._ws_client.send("/data")
                 for gn in self._group_names:
                     await self._ws_client.send(f"/subscribe {group_name_to_endpoint(gn)}")
@@ -536,7 +546,7 @@ class DTN7Backend(Backend):
             # register and subscribe to all newsgroup endpoints
             self.logger.debug("Contacting DTNs REST interface")
             try:
-                self._rest_client = DTNRESTClient(host=host, port=port)
+                self._rest_client = DTNRESTClient(host=f"http://{host}", port=port)
                 self.logger.info("Successfully contacted REST interface")
             except ConnectionError:
                 if retries >= max_retries:

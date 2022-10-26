@@ -23,7 +23,6 @@ isort = "^5.10.1"
 # For, "env", following settings are possible:
 #   - "dev": development environment, this will load config.dev.toml
 #   - "prod": production environment, this will load config.prod.toml
-#   - "test": testing environment, this will load config.test.toml
 [monntpy]
 env = "dev"
 
