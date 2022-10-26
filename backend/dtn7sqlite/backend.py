@@ -145,9 +145,6 @@ class DTN7Backend(Backend):
 
         await self._rest_connector()
 
-        # execute the WS connector in a new thread
-        # asyncio.new_event_loop().run_until_complete(self._ws_runner())
-        # self._ws_runner = asyncio.create_task(self._ws_runner())
         await self._ingest_all_from_dtnd()
 
         _janitor_task: Task = self._loop.create_task(self._janitor())
@@ -407,22 +404,7 @@ class DTN7Backend(Backend):
             # the article has been sent to the dtnd, some are dropped entirely:
             # newsgroup, from, created_at, message_id, path, reply_to, organization, user_agent
         }
-        # if config["bundles"]["compress_body"]:
-        #     self.logger.debug("Compression is turned on, compressing body with zlib")
-        #     dtn_payload["compressed"] = True
-        #     dtn_payload["body"] = zlib.compress(body.encode())
-        # else:
-        #     dtn_payload["body"] = body
 
-        # sender email address is defined through backend config, so we don't need to parse it from
-        # the incoming data:
-        # if "sender" in header:
-        #     header["from"] = header["sender"]
-        # try:
-        #     sender_email: str = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", header["from"]).group(0)
-        # except AttributeError as e:
-        #     self.logger.warning(f"Email address could not be parsed: {e}")
-        #     sender_email: str = "not-recognized@email-address.net"
         sender_email = config["usenet"]["email"]
         source: str = self._nntpfrom_to_bp7source(from_=sender_email)
         dtn_args: dict = {
@@ -448,13 +430,7 @@ class DTN7Backend(Backend):
         self.logger.debug(f"Created entry in DTNd message spool with id {dtn_msg.id}")
         self.logger.debug(f"Sending message {dtn_msg.id} to dtnd")
 
-        # send_task: Task = self._loop.create_task(
-        #     self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
-        # )
-        # self._background_tasks.add(send_task)
-        # send_task.add_done_callback(self._background_tasks.discard)
         await self._send_to_dtnd(dtn_args=dtn_args, dtn_payload=dtn_payload, hash_=message_hash)
-        # self.logger.debug(f"Done sending spooled message {dtn_msg.id} to dtnd")
 
     async def _init_db(self) -> None:
         await Tortoise.init(
@@ -467,9 +443,8 @@ class DTN7Backend(Backend):
 
     async def _ws_runner(self) -> None:
         """
-        Must be run in a Thread and will keep a WS-connection open for as long as the
-        server lives. Reconnects automatically when the connection drops and uses exponential
-        backoff to pace reconnection attempts
+        Will keep a WS-connection open for as long as the server lives. Reconnects automatically
+        when the connection drops and uses exponential backoff to pace reconnection attempts
         """
 
         self.logger.debug("Setting up WS connection to dtnd")
@@ -541,10 +516,8 @@ class DTN7Backend(Backend):
                 continue
 
     async def _rest_connector(self) -> None:
-        # TODO: in the backend object, install a periodic task that checks to see of the REST
-        #  connection is still alive.
         # - Maybe even a decorator for every function that contains a rest call to enable
-        #   exponentioal backoff?
+        #   exponential backoff?
         # - Every rest call has to be wrapped in a try catch block that reinstates the REST client
         #   in case the call fails.
         # - One more possibility: move all the startup and reconnect tasks into a separate thread
@@ -583,6 +556,25 @@ class DTN7Backend(Backend):
             else:
                 # register all groups with the DTNd backend.
                 await self._register_all_groups()
+
+    async def _rest_runner(self) -> None:
+        """
+        This is a task that periodically checks of the REST connection is still alive and
+        reconnects in case it fails.
+        """
+        while True:
+            self.logger.debug("REST runner task reporting for duty")
+            try:
+                if len(self._rest_client.info) > 0:
+                    pass
+            except Exception as e:  # noqa E722
+                self.logger.warning(f"There seems to be a problem with the REST connection: {e}")
+                await self._rest_connector()
+            self.logger.debug(
+                "REST runner task going to sleep for"
+                f" {config['backend']['rest_check'] / 1000} seconds"
+            )
+            await asyncio.sleep(config["backend"]["rest_check"] / 1000)
 
     async def _handle_backchannel_data(self, ws_struct: dict):
         self.logger.debug("Mapping BP7 to NNTP fields")

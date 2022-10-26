@@ -1,5 +1,6 @@
 [backend]
 db_url = "sqlite://db.sqlite3"
+rest_check = "20s"
 
 [dtnd]
 host = "http://127.0.0.1"
@@ -32,4 +33,5 @@ newsgroups = [
 ]
 
 [janitor]
+# duration between janitor runs. 0 switches janitor off.
 sleep = "5m"

@@ -22,6 +22,7 @@ human-readable format according to the specifications of that package, e.g.
 3d2h32m
 1w3d2h32m
 1w 3d 2h 32m
+...
 ```
 
 
