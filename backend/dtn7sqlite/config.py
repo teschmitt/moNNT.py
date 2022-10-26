@@ -16,7 +16,6 @@ config_defaults = {
         "port": 3000,
         "rest_path": "",
         "ws_path": "/ws",
-        "multi_user": False,
     },
     "backoff": {
         "initial_wait": 0.1,
@@ -41,7 +40,12 @@ try:
     config = load(toml_path)
 
     # parse all config time values into millisecond values
-    for k1, k2 in [("bundles", "lifetime"), ("usenet", "expiry_time"), ("janitor", "sleep")]:
+    for k1, k2 in [
+        ("bundles", "lifetime"),
+        ("usenet", "expiry_time"),
+        ("janitor", "sleep"),
+        ("backend", "rest_check"),
+    ]:
         try:
             config[k1][k2] = parse(config[k1][k2]) * 1000
         except TypeError:

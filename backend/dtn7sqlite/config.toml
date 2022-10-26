@@ -2,28 +2,53 @@
 db_url = "sqlite://db.sqlite3"
 rest_check = "20s"
 
+# options for contacting the dtnd
 [dtnd]
+# host running the dtnd
 host = "http://127.0.0.1"
+# port to contact the web services on
 port = 3000
+# node id for this node. It is very (!) important to keep this snyced to the --nodeid argument used to
+# start the dtnd. In case of a disconnection, this option will be used to addess bundles so if this
+# option is misconfigured, you will see bundle losses and errors
 node_id = "dtn://n1/"
+# path to REST API
 rest_path = ""
+# path to WS API
 ws_path = "/ws"
-multi_user = false
 
+
+# backoff configuration (all settings are in seconds)
 [backoff]
 initial_wait = 0.1
 max_retries = 20
+# after max_retries with increasing pauses, wait for this long before starting the next pass
 reconnection_pause = 300
-constant_wait = 0.75
+# somtimes constant wait times are used. This is the constant wait period
+constant_wait = 1
 
+# bundle options
 [bundles]
-lifetime = "1s"  # check backend README for formatting rules
+# bundle lifetime in the dtn after which they are deleted
+lifetime = "2w"  # check backend README for formatting rules
+# delivery notification for bundles. Try to keep this off as it causes much traffic and
+# the notifications are not used anywhere
 delivery_notification = false
+# use zlib to compress body before sending to dtnd. Other than on extremely low-powered hardware,
+# this should always be turned on to conserve bandwidth in the network
 compress_body = true
 
+
+# options having to do with the usage of usenet
 [usenet]
+# how long to keep articles in db before deleting them again (see also janitor section below)
 expiry_time = "28d"  # check backend README for formatting rules, 0 for no expiry
+# email address to use as From: when sending articles
 email = "t.e.schmitt@posteo.de"
+# newsgroups carried by this server. This list is the single truth defining what newsgroups
+# are registered with the dtnd. Only articles of these newsgroups will be available on this
+# server and deleting a newsgroup from this list will also permanently delete all its articles
+# from the database.
 newsgroups = [
     "monntpy.dev",
     "monntpy.offtopic",
@@ -32,6 +57,8 @@ newsgroups = [
     "monntpy.users.jlu-giessen",
 ]
 
+
+# the janitor is a periodic task that prunes expired articles from the db
 [janitor]
 # duration between janitor runs. 0 switches janitor off.
 sleep = "5m"
