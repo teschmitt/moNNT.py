@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List, Union
 
 from tortoise.functions import Max, Min
 
-from models import Newsgroup
+from backend.dtn7sqlite.models import Newsgroup
 from status_codes import StatusCodes
 from utils import get_datetime
 

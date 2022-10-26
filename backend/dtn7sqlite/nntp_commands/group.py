@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from tortoise.functions import Count, Max, Min
 
-from models import Article, Newsgroup
+from backend.dtn7sqlite.models import Article, Newsgroup
 from status_codes import StatusCodes
 
 if TYPE_CHECKING:

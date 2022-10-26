@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, List, Optional, Union
 
-from models import Article
+from backend.dtn7sqlite.models import Article
 from status_codes import StatusCodes
 from utils import (
     ParsedRange,

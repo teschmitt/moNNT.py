@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, List, Union
 
-from models import Article, Newsgroup
+from backend.dtn7sqlite.models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import get_datetime, groupname_filter
 

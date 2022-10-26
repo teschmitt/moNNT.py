@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List, Union
 
 from tortoise.queryset import QuerySet
 
-from models import Article
+from backend.dtn7sqlite.models import Article
 from status_codes import StatusCodes
 from utils import get_bytes_len, get_num_lines
 

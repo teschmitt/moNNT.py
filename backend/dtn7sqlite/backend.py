@@ -26,6 +26,7 @@ from tortoise.transactions import in_transaction
 from backend.base import Backend
 from backend.dtn7sqlite import get_all_newsgroups
 from backend.dtn7sqlite.config import config
+from backend.dtn7sqlite.models import Article, DTNMessage, Newsgroup
 from backend.dtn7sqlite.nntp_commands import (
     article,
     capabilities,
@@ -53,7 +54,6 @@ from backend.dtn7sqlite.utils import (
     get_article_hash,
     group_name_to_endpoint,
 )
-from models import Article, DTNMessage, Newsgroup
 
 if TYPE_CHECKING:
     from nntp_server import AsyncNNTPServer
@@ -457,7 +457,9 @@ class DTN7Backend(Backend):
         # self.logger.debug(f"Done sending spooled message {dtn_msg.id} to dtnd")
 
     async def _init_db(self) -> None:
-        await Tortoise.init(db_url=config["backend"]["db_url"], modules={"models": ["models"]})
+        await Tortoise.init(
+            db_url=config["backend"]["db_url"], modules={"models": ["backend.dtn7sqlite.models"]}
+        )
         # generate schema only if table does not exist yet
         await Tortoise.generate_schemas(safe=True)
 

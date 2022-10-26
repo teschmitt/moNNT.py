@@ -3,7 +3,7 @@ from hashlib import sha256
 from typing import List
 
 from backend.dtn7sqlite.config import config
-from models import Article, Newsgroup
+from backend.dtn7sqlite.models import Article, Newsgroup
 
 
 async def get_all_newsgroups() -> dict:

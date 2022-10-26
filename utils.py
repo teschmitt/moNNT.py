@@ -7,8 +7,8 @@ from typing import List
 
 import toml
 
+from backend.dtn7sqlite.models import Article
 from config import server_config
-from models import Article
 
 
 class RangeParseStatus(Enum):

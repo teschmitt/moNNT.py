@@ -2,8 +2,8 @@ from typing import TYPE_CHECKING, List, Optional, Union
 
 from tortoise.functions import Max, Min
 
+from backend.dtn7sqlite.models import Newsgroup
 from logger import global_logger
-from models import Newsgroup
 from status_codes import StatusCodes
 from utils import groupname_filter
 

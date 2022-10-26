@@ -1,7 +1,7 @@
 from tortoise import fields
 from tortoise.models import Model
 
-from models.newsgroup import Newsgroup
+from backend.dtn7sqlite.models.newsgroup import Newsgroup
 
 
 class Article(Model):

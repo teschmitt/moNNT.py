@@ -4,9 +4,9 @@ from logging import Logger
 from typing import List, Optional, Union
 
 from backend.base import Backend
+from backend.dtn7sqlite.models import Article, Newsgroup
 from client_connection import ClientConnection
 from logger import global_logger
-from models import Article, Newsgroup
 
 
 class AsyncNNTPServer:

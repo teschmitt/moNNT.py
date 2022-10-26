@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, List, Optional, Union
 from tortoise.functions import Count, Max, Min
 from tortoise.queryset import ValuesQuery
 
-from models import Article, Newsgroup
+from backend.dtn7sqlite.models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import ParsedRange, RangeParseStatus
 

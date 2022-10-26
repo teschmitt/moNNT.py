@@ -2,9 +2,9 @@ from asyncio import StreamReader, StreamWriter, wait_for
 from logging import Logger
 from typing import TYPE_CHECKING, List, Optional
 
+from backend.dtn7sqlite.models import Article, Newsgroup
 from config import server_config
 from logger import global_logger
-from models import Article, Newsgroup
 from status_codes import StatusCodes
 from utils import get_version
 
