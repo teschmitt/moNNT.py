@@ -12,6 +12,7 @@ py-dtn7 = "^0.2.1-alpha4"
 toml = "^0.10.2"
 pytimeparse2 = "^1.5.0"
 websockets = "^10.3"
+python-dateutil = "^2.8.2"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^5.0.4"
@@ -23,6 +24,10 @@ isort = "^5.10.1"
 # For, "env", following settings are possible:
 #   - "dev": development environment, this will load config.dev.toml
 #   - "prod": production environment, this will load config.prod.toml
+
+[tool.poetry.group.dev.dependencies]
+flameprof = "^0.4"
+
 [monntpy]
 env = "dev"
 

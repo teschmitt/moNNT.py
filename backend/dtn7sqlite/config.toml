@@ -44,12 +44,13 @@ compress_body = true
 # how long to keep articles in db before deleting them again (see also janitor section below)
 expiry_time = "28d"  # check backend README for formatting rules, 0 for no expiry
 # email address to use as From: when sending articles
-email = "t.e.schmitt@posteo.de"
+email = "monntpy@tu-darmstadt.de"
 # newsgroups carried by this server. This list is the single truth defining what newsgroups
 # are registered with the dtnd. Only articles of these newsgroups will be available on this
 # server and deleting a newsgroup from this list will also permanently delete all its articles
 # from the database.
 newsgroups = [
+    "monntpy.eval",
     "monntpy.dev",
     "monntpy.offtopic",
     "monntpy.users.tu-darmstadt",

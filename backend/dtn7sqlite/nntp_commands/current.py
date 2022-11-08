@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def get_current_messages(limit: int) -> QuerySet[Article]:
-    return Article.all().order_by("created_at").limit(limit)
+    return Article.all().order_by("-created_at").limit(limit)
 
 
 async def do_current(client_conn: "ClientConnection") -> Union[List[str], str]:
