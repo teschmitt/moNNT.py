@@ -11,7 +11,7 @@ logger: Logger = global_logger()
 config_defaults = {
     "backend": {"db_url": "sqlite://db.sqlite3"},
     "dtnd": {
-        "host": "http://127.0.0.1",
+        "host": "127.0.0.1",
         "node_id": "dtn://n1/",
         "port": 3000,
         "rest_path": "",
