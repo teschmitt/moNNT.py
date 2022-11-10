@@ -8,7 +8,7 @@ authors = ["Thomas Schmitt <t.e.schmitt@posteo.de>"]
 python = "^3.7.1"
 tortoise-orm = "^0.19.0"
 # py-dtn7 = {path = "../py-dtn7", develop = true}
-py-dtn7 = "^0.2.1-alpha4"
+py-dtn7 = "0.2.1-alpha4"
 toml = "^0.10.2"
 pytimeparse2 = "^1.5.0"
 websockets = "^10.3"
